@@ -19,7 +19,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install
-        run: pip install -e ".[dev]"
+        run: |
+          pip install -e ".[dev]"
+          pip install -e "server/[dev]"
 
-      - name: Test
+      - name: Test tessa (CLI package)
         run: pytest
+
+      - name: Test tessa-server
+        run: cd server && pytest
