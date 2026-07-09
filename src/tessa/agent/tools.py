@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Literal
 
+from tessa.agent import facts
 from tessa.config.settings import TessaConfig
 from tessa.tools import filesystem, git
 from tessa.tools.terminal import classify_command, run_command
@@ -206,6 +207,15 @@ def _git_push(args: dict, ctx: ToolContext) -> ToolResult:
     return ToolResult(ok=True, content=result, summary=result)
 
 
+# -- memory -----------------------------------------------------------------
+
+
+def _remember(args: dict, ctx: ToolContext) -> ToolResult:
+    fact = facts.remember(ctx.root, args["fact"])
+    message = f"Remembered: {fact.text}"
+    return ToolResult(ok=True, content=message, summary=message)
+
+
 def build_registry() -> list[ToolSpec]:
     return [
         ToolSpec(
@@ -320,5 +330,16 @@ def build_registry() -> list[ToolSpec]:
                 },
             },
             "confirm", _git_push,
+        ),
+        ToolSpec(
+            "remember",
+            "Save a short, durable fact about this project so it's remembered in future "
+            "sessions (tech stack, conventions, decisions). Not for one-off task details.",
+            {
+                "type": "object",
+                "properties": {"fact": {"type": "string", "description": "The fact, written as a standalone statement"}},
+                "required": ["fact"],
+            },
+            "safe", _remember,
         ),
     ]

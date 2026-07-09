@@ -17,6 +17,15 @@ context — each one names the files to touch and what "done" looks like.
   push. File writes/deletes/commits/pushes always show a diff or message and
   require y/n approval; writes/deletes keep a timestamped backup. All
   filesystem tools refuse to touch paths outside the project root.
+- **M6 — Persistent project memory.** `agent/facts.py` stores a curated,
+  capped list of facts at `.tessa/memory.json` (separate from the raw
+  session transcript in `agent/memory.py`, which is a log, not something fed
+  back into future conversations). Facts are folded into the system prompt
+  via `agent/prompts.py::build_system_prompt`. Three ways to add one: the
+  model calling the `remember` tool mid-conversation, `/remember <fact>` /
+  `/memory` / `/forget <n>` slash commands in chat, or `tessa memory
+  add/list/forget` outside of chat. Verified end-to-end: a fact added in one
+  process is present in a fresh process's system prompt with no extra steps.
 
 M3 was done before M2 on purpose: it was the part that turns Tessa into an
 *agent* rather than a chatbot, and every repo tested against so far fits
@@ -59,34 +68,9 @@ window.
 **Done when:** a query about a feature in a 5,000+ file repo finds the
 right file without the model needing to `list_dir` its way there manually.
 
-### M6 — Persistent project memory
-
-**Problem it solves:** `agent/memory.py::SessionHistory` is a transcript —
-useful for `/new` and debugging, useless for "remember this project uses
-PostgreSQL" persisting *across* sessions. Nothing currently reads old
-session files back into a new conversation.
-
-**Approach:**
-1. `.tessa/memory.json` — a small list of curated facts (not a full
-   transcript), each with the text and a timestamp. Add functions to
-   `agent/memory.py` (or a new `agent/facts.py`) to load/append/list them.
-2. Add a `remember` tool (safe risk tier) to `agent/tools.py` so the model
-   can call `remember(fact="this project uses PostgreSQL")` when the user
-   says something worth persisting, plus a `/remember <text>` slash command
-   in `cli/chat.py` for the user to add one directly.
-3. Fold stored facts into `agent/prompts.py::build_system_prompt`, the same
-   way project-scanner output already is.
-4. Consider a size cap / summarization step so memory.json doesn't grow
-   unbounded — out of scope for a first pass, but note it so it doesn't
-   surprise anyone later.
-
-**Done when:** telling Tessa a fact in one session and starting a fresh
-`tessa` session later (after `/new` or a new process) shows the model still
-knows it.
-
 ### M7 — Plugins (stretch)
 
-Lowest priority; only worth doing once M2/M6 are solid. Original idea from
+Lowest priority; only worth doing once M2 is solid. Original idea from
 project scoping: VS Code extension, browser automation, voice mode, web
 search, doc lookup, CI/CD integration. No design work has started — if you
 pick this up, start by defining what a "plugin" actually extends (a new
@@ -97,10 +81,9 @@ tool? a new slash command? both?) before writing code.
 - **CI.** No GitHub Actions workflow yet. Add `.github/workflows/test.yml`
   running `pytest` on push/PR — the test suite has zero external
   dependencies (Ollama calls are all mocked), so this is a quick win.
-- **CLI-level tests.** All 59 existing tests exercise `tools/`, `agent/`,
-  `llm/`, `config/`, `context/` directly; nothing uses Typer's `CliRunner`
-  against `cli/main.py`. Worth adding a thin layer of tests for `tessa
-  analyze`, `tessa config set`, etc.
+- **More CLI-level tests.** `tests/test_cli_memory.py` covers `tessa memory
+  *` via Typer's `CliRunner`; the same pattern isn't applied yet to `tessa
+  analyze`, `tessa config set`, `tessa init`, etc.
 - **Undo command.** Writes/deletes already back up to `.tessa/backups/`
   before touching a file, but there's no `tessa restore` to pull one back —
   right now that's a manual `cp`.

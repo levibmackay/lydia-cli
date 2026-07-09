@@ -8,6 +8,7 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.styles import Style
 
+from tessa.agent import facts
 from tessa.agent.loop import run_agent_turn
 from tessa.agent.memory import SessionHistory
 from tessa.agent.prompts import build_system_prompt
@@ -26,6 +27,9 @@ HELP_TEXT = """\
 | `/model <name>` | Switch model for this session |
 | `/models` | List installed Ollama models |
 | `/new` | Start a fresh conversation |
+| `/remember <fact>` | Save a fact that persists across sessions |
+| `/memory` | List remembered facts |
+| `/forget <n>` | Remove remembered fact #n |
 | `/exit` | Quit (also Ctrl-D) |
 """
 
@@ -41,13 +45,20 @@ class ChatSession:
         self.client = client
         self.model = model
         self.root = project_root or Path.cwd()
-        self.system_prompt = build_system_prompt(summary)
+        self.summary = summary
+        self.facts = facts.load_facts(self.root)
+        self.system_prompt = build_system_prompt(summary, self.facts)
         self.messages: list[Message] = []
         self.history = SessionHistory(project_root)
         self.registry = build_registry()
 
     def reset(self) -> None:
         self.messages.clear()
+
+    def refresh_facts(self) -> None:
+        """Reload remembered facts from disk and fold them back into the prompt."""
+        self.facts = facts.load_facts(self.root)
+        self.system_prompt = build_system_prompt(self.summary, self.facts)
 
     def send(self, user_text: str) -> None:
         user_message = Message(role="user", content=user_text)
@@ -76,6 +87,7 @@ class ChatSession:
             ui.print_error(str(exc))
             return
         self.history.append(Message(role="assistant", content=reply))
+        self.refresh_facts()  # pick up anything remembered via the tool this turn
         line = ui.format_stats(stats)
         if line:
             ui.console.print(f"[dim]{line}[/dim]")
@@ -170,6 +182,32 @@ def _handle_slash(text: str, session: ChatSession) -> bool:
             ui.print_info(f"Switched to {argument} for this session.")
         else:
             ui.print_error(f"Model '{argument}' is not installed. Try `ollama pull {argument}`.")
+    elif command == "/remember":
+        if not argument:
+            ui.print_error("Usage: /remember <fact>")
+        else:
+            fact = facts.remember(session.root, argument)
+            session.refresh_facts()
+            ui.print_info(f"Remembered: {fact.text}")
+    elif command == "/memory":
+        if not session.facts:
+            ui.print_info("No facts remembered yet. Use /remember <fact> to add one.")
+        else:
+            for i, fact in enumerate(session.facts, start=1):
+                ui.console.print(f"  {i}. {fact.text}  [dim]{fact.created_at}[/dim]")
+    elif command == "/forget":
+        try:
+            index = int(argument)
+        except ValueError:
+            ui.print_error("Usage: /forget <n> — see /memory for fact numbers.")
+        else:
+            try:
+                removed = facts.forget(session.root, index)
+            except ValueError as exc:
+                ui.print_error(str(exc))
+            else:
+                session.refresh_facts()
+                ui.print_info(f"Forgot: {removed.text}")
     else:
         ui.print_error(f"Unknown command {command}. Try /help.")
     return False

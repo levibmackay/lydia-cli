@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from tessa.agent.facts import Fact
 from tessa.context.scanner import ProjectSummary
 
 SYSTEM_PROMPT = """\
@@ -27,21 +28,32 @@ using them:
 - If a tool call is declined or fails, do not silently retry the same
   thing; explain what happened and ask how to proceed.
 - After making changes, briefly summarize what you did and why.
+
+You also have a `remember` tool that saves a short, durable fact about this
+project to disk so it's still known in future sessions (tech stack,
+conventions, decisions, anything the user says to remember). Use it when the
+user tells you something worth persisting — don't use it for one-off task
+details that only matter for the current request.
 """
 
 
-def build_system_prompt(summary: ProjectSummary | None = None) -> str:
-    """System prompt, optionally enriched with a snapshot of the current project."""
-    if summary is None:
-        return SYSTEM_PROMPT
-    languages = ", ".join(f"{name} {pct}%" for name, pct in summary.languages.items()) or "unknown"
-    manifests = ", ".join(summary.manifest_files[:8]) or "none found"
-    return (
-        SYSTEM_PROMPT
-        + "\nCurrent project context:\n"
-        + f"- Root: {summary.root}\n"
-        + f"- Type: {summary.project_kind}\n"
-        + f"- Files: {summary.file_count}, lines of code: {summary.total_lines}\n"
-        + f"- Languages: {languages}\n"
-        + f"- Key files: {manifests}\n"
-    )
+def build_system_prompt(
+    summary: ProjectSummary | None = None, facts: list[Fact] | None = None
+) -> str:
+    """System prompt, optionally enriched with the project snapshot and remembered facts."""
+    prompt = SYSTEM_PROMPT
+    if summary is not None:
+        languages = ", ".join(f"{name} {pct}%" for name, pct in summary.languages.items()) or "unknown"
+        manifests = ", ".join(summary.manifest_files[:8]) or "none found"
+        prompt += (
+            "\nCurrent project context:\n"
+            + f"- Root: {summary.root}\n"
+            + f"- Type: {summary.project_kind}\n"
+            + f"- Files: {summary.file_count}, lines of code: {summary.total_lines}\n"
+            + f"- Languages: {languages}\n"
+            + f"- Key files: {manifests}\n"
+        )
+    if facts:
+        lines = "\n".join(f"- {fact.text}" for fact in facts)
+        prompt += f"\nRemembered facts about this project (from earlier sessions):\n{lines}\n"
+    return prompt

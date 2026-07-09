@@ -20,6 +20,7 @@ import typer
 from rich.table import Table
 
 from tessa import __version__
+from tessa.agent import facts
 from tessa.cli import ui
 from tessa.cli.chat import resolve_model, run_chat
 from tessa.config.settings import (
@@ -42,6 +43,12 @@ app = typer.Typer(
 )
 config_app = typer.Typer(help="View and change configuration.")
 app.add_typer(config_app, name="config")
+memory_app = typer.Typer(help="View and manage remembered project facts.")
+app.add_typer(memory_app, name="memory")
+
+
+def _memory_root() -> Path:
+    return find_project_root() or Path.cwd()
 
 
 @app.callback(invoke_without_command=True)
@@ -148,8 +155,8 @@ def init() -> None:
     config_file.parent.mkdir(parents=True, exist_ok=True)
     config_file.write_text(json.dumps({}, indent=2) + "\n", encoding="utf-8")
     gitignore = config_file.parent / ".gitignore"
-    gitignore.write_text("history/\n", encoding="utf-8")
-    ui.print_info(f"Initialized {config_file.parent}/ (history/ is git-ignored)")
+    gitignore.write_text("history/\nbackups/\n", encoding="utf-8")
+    ui.print_info(f"Initialized {config_file.parent}/ (history/ and backups/ are git-ignored)")
 
 
 @config_app.command("show")
@@ -186,6 +193,35 @@ def config_set(
         ui.print_error(str(exc))
         raise typer.Exit(1)
     ui.print_info(f"Set {key} = {value} in {path}")
+
+
+@memory_app.command("list")
+def memory_list() -> None:
+    """List remembered facts about the current project."""
+    remembered = facts.load_facts(_memory_root())
+    if not remembered:
+        ui.print_info("No facts remembered yet. Use `tessa memory add <fact>` to add one.")
+        return
+    for i, fact in enumerate(remembered, start=1):
+        ui.console.print(f"  {i}. {fact.text}  [dim]{fact.created_at}[/dim]")
+
+
+@memory_app.command("add")
+def memory_add(fact: str = typer.Argument(..., help="The fact to remember")) -> None:
+    """Remember a fact about the current project."""
+    saved = facts.remember(_memory_root(), fact)
+    ui.print_info(f"Remembered: {saved.text}")
+
+
+@memory_app.command("forget")
+def memory_forget(index: int = typer.Argument(..., help="Fact number, as shown by `tessa memory list`")) -> None:
+    """Forget a remembered fact by number."""
+    try:
+        removed = facts.forget(_memory_root(), index)
+    except ValueError as exc:
+        ui.print_error(str(exc))
+        raise typer.Exit(1)
+    ui.print_info(f"Forgot: {removed.text}")
 
 
 def main() -> None:

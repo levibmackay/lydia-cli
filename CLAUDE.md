@@ -112,10 +112,17 @@ warning rather than erroring, so old config files don't break on upgrade.
 ## Current state and what's next
 
 See `README.md` for the user-facing feature list and `ROADMAP.md` for the
-detailed next-steps plan. Short version: Milestones 1 (CLI + streaming chat)
-and 3 (agent loop + tool calling + git) are done; Milestone 2 (embeddings/
-retrieval, needed once a project is too big for full-file context) and
-Milestone 6 (persistent project memory beyond the raw JSONL session log in
-`agent/memory.py`) are not started. Check `ROADMAP.md` before picking up new
-work — it has the reasoning for why M3 was done before M2, and concrete
-next steps with file-level pointers.
+detailed next-steps plan. Short version: Milestones 1 (CLI + streaming
+chat), 3 (agent loop + tool calling + git), and 6 (persistent project
+memory — `agent/facts.py`, distinct from the raw session transcript in
+`agent/memory.py`) are done. Milestone 2 (embeddings/retrieval, needed once
+a project is too big for full-file context) is not started. Check
+`ROADMAP.md` before picking up new work — it has the reasoning for why M3
+was done before M2, and concrete next steps with file-level pointers.
+
+## Standing preferences for this repo
+
+- **Never add a `Co-Authored-By: Claude` (or any Claude/Anthropic)
+  attribution trailer to commit messages here.** The user wants to be the
+  sole contributor shown on GitHub — this was explicitly requested and
+  enforced once already by rewriting pushed history to strip it.

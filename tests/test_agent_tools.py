@@ -93,6 +93,15 @@ def test_run_command_ask_mode_confirms_even_safe_commands(tmp_path: Path) -> Non
     assert len(asked) == 1
 
 
+def test_remember_tool_is_safe_and_persists(tmp_path: Path) -> None:
+    from tessa.agent.facts import load_facts
+
+    result = get("remember").handler({"fact": "uses PostgreSQL"}, ctx(tmp_path, confirm_result=False))
+    assert result.ok
+    assert "uses PostgreSQL" in result.content
+    assert [f.text for f in load_facts(tmp_path)] == ["uses PostgreSQL"]
+
+
 def test_git_commit_requires_confirmation(tmp_path: Path) -> None:
     import subprocess
 

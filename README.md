@@ -93,9 +93,10 @@ ln -s "$PWD/.venv/bin/tessa" /opt/homebrew/bin/tessa   # or anywhere on your PAT
 | `tessa init` | Create `.tessa/` project config |
 | `tessa config show` | Show effective (merged) configuration |
 | `tessa config set model qwen3.5:9b` | Set a config value (`--project` for per-repo) |
+| `tessa memory list` / `add <fact>` / `forget <n>` | View/manage facts Tessa remembers about this project |
 
 Inside chat: `/help`, `/model <name>`, `/models`, `/new` (fresh conversation),
-`/exit`.
+`/remember <fact>`, `/memory`, `/forget <n>`, `/exit`.
 
 ### A typical session
 
@@ -154,10 +155,26 @@ classified into a risk tier that decides whether it needs your approval:
 | `write_file`, `delete_file` | confirm | Shows a diff, asks y/n, keeps a backup in `.tessa/backups/` |
 | `git_commit`, `git_push` | confirm | Shows the message/target, asks y/n |
 | `run_command` | policy | Safe-looking commands follow `permission_mode`; anything matching a destructive pattern always asks, regardless of mode |
+| `remember` | safe | Saves a fact to `.tessa/memory.json` so it's known in future sessions |
 
 All file paths are resolved relative to the project root and refused if they
 try to escape it (`..`, absolute paths outside the project) — a confused or
 adversarial model can't touch files elsewhere on your machine.
+
+## Memory
+
+Tessa keeps two different kinds of history, deliberately separate:
+
+- **Session transcripts** (`.tessa/history/*.jsonl`) — a full append-only log
+  of every conversation, one file per session. Useful for debugging, not fed
+  back into future conversations, and git-ignored.
+- **Remembered facts** (`.tessa/memory.json`) — a short, curated list of
+  things worth persisting across sessions (tech stack, conventions,
+  decisions), added either by you (`/remember <fact>` in chat, or `tessa
+  memory add <fact>`) or by the model itself via the `remember` tool when
+  you tell it something worth keeping. These are folded into the system
+  prompt on every session, so Tessa actually remembers them next time you
+  open the project — and unlike history, this file is meant to be committed.
 
 ## Architecture
 
@@ -191,11 +208,11 @@ repo in `tmp_path`. None of them require a running Ollama daemon.
 
 ## Roadmap
 
-Milestones 1 (core CLI) and 3 (agent loop, tool calling, git workflows) are
-done. See [`ROADMAP.md`](ROADMAP.md) for the detailed plan on what's next —
-retrieval/embeddings for large repos, persistent cross-session project
-memory, and a backlog of smaller polish items (CI, an undo command, a
-non-interactive mode, packaging).
+Milestones 1 (core CLI), 3 (agent loop, tool calling, git workflows), and 6
+(persistent project memory) are done. See [`ROADMAP.md`](ROADMAP.md) for the
+detailed plan on what's next — retrieval/embeddings for large repos, and a
+backlog of smaller polish items (CI, an undo command, a non-interactive
+mode, packaging).
 
 ## License
 
