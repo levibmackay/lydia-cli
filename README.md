@@ -90,6 +90,7 @@ ln -s "$PWD/.venv/bin/tessa" /opt/homebrew/bin/tessa   # or anywhere on your PAT
 |---|---|
 | `tessa` | Interactive agent chat in the current project |
 | `tessa ask "why is this failing?"` | One-shot question, no tools, good for scripts |
+| `tessa ask "..." --yes` | Same, but with full tool access — auto-approves everything except dangerous commands, for scripts/CI with no one to answer a y/n prompt |
 | `tessa analyze` | Project summary: languages, size, key files |
 | `tessa models` | List installed Ollama models |
 | `tessa index` | Build/refresh the semantic search index (for `search_semantic`) |

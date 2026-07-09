@@ -28,6 +28,7 @@ from tessa.agent import facts
 from tessa.cli import ui
 from tessa.cli.chat import resolve_model, run_chat
 from tessa.config.settings import (
+    TessaConfig,
     coerce_value,
     find_project_root,
     global_config_path,
@@ -80,6 +81,12 @@ def default(
 def ask(
     question: str = typer.Argument(..., help="A single question for Tessa."),
     model: str | None = typer.Option(None, "--model", "-m", help="Override the model."),
+    yes: bool = typer.Option(
+        False, "--yes", "-y",
+        help="Give Tessa tool access (read/write/run/git) for this question, "
+        "auto-approving anything that isn't flagged dangerous. For scripts/CI "
+        "where there's no one to answer a y/n prompt.",
+    ),
 ) -> None:
     """Ask one question and print the answer (useful for scripts)."""
     config = load_config()
@@ -88,21 +95,43 @@ def ask(
     with OllamaClient(host=config.ollama_host) as client:
         try:
             resolved = resolve_model(client, config)
-            reply, _ = ui.stream_response(
-                client.chat_stream(
-                    model=resolved,
-                    messages=[Message(role="user", content=question)],
-                    temperature=config.temperature,
-                    num_ctx=config.num_ctx,
-                    think=config.think_flag,
-                    keep_alive=config.keep_alive,
+            if yes:
+                reply, _ = _ask_with_tools(client, resolved, config, question)
+            else:
+                reply, _ = ui.stream_response(
+                    client.chat_stream(
+                        model=resolved,
+                        messages=[Message(role="user", content=question)],
+                        temperature=config.temperature,
+                        num_ctx=config.num_ctx,
+                        think=config.think_flag,
+                        keep_alive=config.keep_alive,
+                    )
                 )
-            )
         except OllamaError as exc:
             ui.print_error(str(exc))
             raise typer.Exit(1)
     if not reply.strip():
         raise typer.Exit(1)
+
+
+def _ask_with_tools(client: OllamaClient, model: str, config: TessaConfig, question: str) -> tuple[str, dict]:
+    """Run one question through the full agent loop (tools + auto-confirm)."""
+    from tessa.agent.loop import run_agent_turn
+    from tessa.agent.prompts import build_system_prompt
+    from tessa.agent.tools import ToolContext, build_registry
+
+    root = find_project_root() or Path.cwd()
+    summary = scan_project(root)
+    ctx = ToolContext(root=root, config=config, confirm=ui.auto_confirm, client=client)
+    messages = [Message(role="user", content=question)]
+    return run_agent_turn(
+        client=client, model=model, temperature=config.temperature,
+        num_ctx=config.num_ctx, think=config.think_flag, keep_alive=config.keep_alive,
+        system_prompt=build_system_prompt(summary), messages=messages,
+        registry=build_registry(), ctx=ctx, stream_fn=ui.stream_agent_response,
+        on_tool_call=ui.print_tool_call, on_tool_result=ui.print_tool_result,
+    )
 
 
 @app.command()

@@ -85,11 +85,11 @@ tool? a new slash command? both?) before writing code.
 - **Undo command.** Writes/deletes already back up to `.tessa/backups/`
   before touching a file, but there's no `tessa restore` to pull one back —
   right now that's a manual `cp`.
-- **`--yes` / non-interactive mode.** For scripting `tessa ask` with tools,
-  or CI usage, a flag that auto-approves `confirm`-tier tools (or a
-  permission_mode value for it) would help. Currently `ask` doesn't use
-  tools at all, which is a deliberate simplification — revisit if that
-  turns out to be too limiting.
+- ~~**`--yes` / non-interactive mode.**~~ Done: `tessa ask "..." --yes`
+  gives `ask` full tool access via `ui.auto_confirm`, which approves
+  everything except tools/commands flagged dangerous (no human present to
+  approve real danger, so it fails safe rather than approving blindly).
+  Plain `tessa ask` without `--yes` is unchanged — still tool-free chat.
 - **Packaging.** `pyproject.toml` is set up for `pip install -e .`; hasn't
   been published anywhere (PyPI, or even a simple `brew tap`) so the README
   install instructions still say "clone this repo."

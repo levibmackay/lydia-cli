@@ -166,6 +166,20 @@ def confirm(request: ConfirmRequest) -> bool:
         return False
 
 
+def auto_confirm(request: ConfirmRequest) -> bool:
+    """Non-interactive confirm: approve everything except flagged-dangerous actions.
+
+    For scripting/CI (`tessa ask --yes`) where there's no one to ask.
+    Mirrors the same "always confirm dangerous things" invariant the
+    interactive path enforces — with no human present, dangerous defaults
+    to declined rather than silently approved.
+    """
+    approved = not request.danger
+    verdict = "auto-approved" if approved else "auto-declined (flagged dangerous)"
+    console.print(f"[dim]{verdict}: {request.title}[/dim]")
+    return approved
+
+
 def _render_confirm_detail(detail: str):
     stripped = detail.strip()
     looks_like_diff = stripped.startswith("---") or "\n@@ " in stripped or stripped.startswith("@@ ")
