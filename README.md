@@ -93,6 +93,7 @@ ln -s "$PWD/.venv/bin/tessa" /opt/homebrew/bin/tessa   # or anywhere on your PAT
 | `tessa analyze` | Project summary: languages, size, key files |
 | `tessa models` | List installed Ollama models |
 | `tessa index` | Build/refresh the semantic search index (for `search_semantic`) |
+| `tessa restore list` / `apply <n>` | List/restore file backups from `.tessa/backups/` |
 | `tessa init` | Create `.tessa/` project config |
 | `tessa config show` | Show effective (merged) configuration |
 | `tessa config set model qwen3.5:9b` | Set a config value (`--project` for per-repo) |

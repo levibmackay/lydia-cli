@@ -156,11 +156,40 @@ def apply_delete(root: Path, path: str) -> str:
 def _backup(root: Path, target: Path, old_content: str) -> None:
     from datetime import datetime, timezone
 
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    # A timestamped directory mirroring the file's own relative path, so
+    # two files with the same name in different directories can't collide,
+    # and restore_backup can reconstruct the original location exactly.
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
     relative = target.relative_to(root)
-    backup_path = root / BACKUP_DIR_NAME / f"{stamp}-{relative.name}"
+    backup_path = root / BACKUP_DIR_NAME / stamp / relative
     try:
         backup_path.parent.mkdir(parents=True, exist_ok=True)
         backup_path.write_text(old_content, encoding="utf-8")
     except OSError:
         pass  # backups are best-effort; never block the edit over this
+
+
+@dataclass
+class BackupEntry:
+    stamp: str
+    path: str  # relative to the project root
+    backup_file: Path
+
+
+def list_backups(root: Path) -> list[BackupEntry]:
+    """All backups, newest first."""
+    backups_dir = root / BACKUP_DIR_NAME
+    if not backups_dir.is_dir():
+        return []
+    entries: list[BackupEntry] = []
+    for stamp_dir in sorted((d for d in backups_dir.iterdir() if d.is_dir()), reverse=True):
+        for file_path in _walk_files(stamp_dir):
+            relative = file_path.relative_to(stamp_dir)
+            entries.append(BackupEntry(stamp=stamp_dir.name, path=str(relative), backup_file=file_path))
+    return entries
+
+
+def restore_backup(root: Path, entry: BackupEntry) -> WriteProposal:
+    """Build a write proposal that restores a backup's content to its original path."""
+    content = entry.backup_file.read_text(encoding="utf-8", errors="replace")
+    return propose_write(root, entry.path, content)

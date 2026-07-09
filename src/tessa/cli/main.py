@@ -4,6 +4,8 @@
     tessa ask "question"       one-shot question, prints the answer
     tessa analyze              summarize the current project
     tessa index                build/refresh the semantic search index
+    tessa restore list         list file backups
+    tessa restore apply N      restore a file to a backed-up version
     tessa models               list installed Ollama models
     tessa init                 create .tessa/ in the current project
     tessa config show          print effective configuration
@@ -18,6 +20,7 @@ import sys
 from pathlib import Path
 
 import typer
+from rich.syntax import Syntax
 from rich.table import Table
 
 from tessa import __version__
@@ -36,6 +39,7 @@ from tessa.context.indexer import EMBED_MODEL, build_index
 from tessa.context.scanner import scan_project
 from tessa.llm.client import OllamaClient, OllamaError
 from tessa.llm.types import Message
+from tessa.tools.filesystem import apply_write, list_backups, restore_backup
 
 app = typer.Typer(
     name="tessa",
@@ -47,6 +51,8 @@ config_app = typer.Typer(help="View and change configuration.")
 app.add_typer(config_app, name="config")
 memory_app = typer.Typer(help="View and manage remembered project facts.")
 app.add_typer(memory_app, name="memory")
+restore_app = typer.Typer(help="List and restore file backups made by write_file/delete_file.")
+app.add_typer(restore_app, name="restore")
 
 
 def _memory_root() -> Path:
@@ -251,6 +257,36 @@ def memory_forget(index: int = typer.Argument(..., help="Fact number, as shown b
         ui.print_error(str(exc))
         raise typer.Exit(1)
     ui.print_info(f"Forgot: {removed.text}")
+
+
+@restore_app.command("list")
+def restore_list() -> None:
+    """List available backups, newest first."""
+    root = find_project_root() or Path.cwd()
+    entries = list_backups(root)
+    if not entries:
+        ui.print_info("No backups yet — they're created automatically when Tessa writes or deletes a file.")
+        return
+    for i, entry in enumerate(entries, start=1):
+        ui.console.print(f"  {i}. {entry.path}  [dim]{entry.stamp}[/dim]")
+
+
+@restore_app.command("apply")
+def restore_apply(index: int = typer.Argument(..., help="Backup number, as shown by `tessa restore list`")) -> None:
+    """Restore a file to a previous backed-up version."""
+    root = find_project_root() or Path.cwd()
+    entries = list_backups(root)
+    if not 1 <= index <= len(entries):
+        ui.print_error(f"No backup #{index}. There are {len(entries)}; see `tessa restore list`.")
+        raise typer.Exit(1)
+    entry = entries[index - 1]
+    proposal = restore_backup(root, entry)
+    ui.console.print(Syntax(proposal.diff, "diff", background_color="default", word_wrap=True))
+    if not typer.confirm(f"Restore {entry.path} to its {entry.stamp} version?"):
+        ui.print_info("Cancelled.")
+        return
+    message = apply_write(root, proposal)
+    ui.print_info(message)
 
 
 def main() -> None:

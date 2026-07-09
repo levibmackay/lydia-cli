@@ -72,6 +72,13 @@ tool? a new slash command? both?) before writing code.
 
 ## Smaller polish items (no milestone, pick up anytime)
 
+- ~~**Undo command.**~~ Done: `tessa restore list` / `tessa restore apply
+  <n>`. Fixed a real bug along the way — backups were previously named
+  `{stamp}-{filename}` with no directory info, so two files with the same
+  name in different directories (e.g. `src/utils.py` and
+  `tests/utils.py`) would silently collide. Backups now live at
+  `.tessa/backups/{stamp}/{original/relative/path}`, mirroring the
+  project tree, so restoring is unambiguous.
 - **More CLI-level tests.** `tests/test_cli_memory.py` covers `tessa memory
   *` via Typer's `CliRunner`; the same pattern isn't applied yet to `tessa
   analyze`, `tessa config set`, `tessa init`, etc.
