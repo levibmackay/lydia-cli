@@ -66,6 +66,7 @@ class ChatSession:
         user_message = Message(role="user", content=user_text)
         self.messages.append(user_message)
         self.history.append(user_message)
+        ui.console.print()  # blank line between the user's input and Lydia's response
         ctx = ToolContext(root=self.root, config=self.config, confirm=ui.confirm, client=self.client)
         try:
             reply, stats = run_agent_turn(
