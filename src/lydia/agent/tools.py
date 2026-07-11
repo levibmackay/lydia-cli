@@ -26,7 +26,7 @@ Session modes (config.mode, see config/settings.py):
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Literal
 
@@ -35,6 +35,7 @@ from lydia.config.settings import LydiaConfig
 from lydia.connectors import ConnectorError
 from lydia.llm.protocol import ModelClient
 from lydia.tools import filesystem, git
+from lydia.tools.filesystem import ToolError
 from lydia.tools.terminal import classify_command, run_command
 
 Risk = Literal["safe", "confirm", "command"]
@@ -52,11 +53,27 @@ class ConfirmRequest:
 
 
 @dataclass
+class Todo:
+    """One item in the session's ephemeral task checklist (see update_todos).
+
+    Unlike agent/facts.py's Fact, this is never persisted to disk — it's a
+    live scratchpad for one run, mirroring Claude Code's own TodoWrite tool.
+    """
+
+    content: str
+    status: Literal["pending", "in_progress", "completed"]
+
+
+@dataclass
 class ToolContext:
     root: Path
     config: LydiaConfig
     confirm: Callable[[ConfirmRequest], bool]
     client: ModelClient | None = None  # reused for tools that need model access (e.g. search_semantic)
+    # Threaded in from the same list object across turns by whoever owns the
+    # session (e.g. cli/chat.py::ChatSession) so mutations here are visible
+    # next turn; non-interactive callers just get a throwaway list per call.
+    todos: list[Todo] = field(default_factory=list)
 
 
 @dataclass
@@ -131,6 +148,11 @@ def _search_code(args: dict, ctx: ToolContext) -> ToolResult:
     return ToolResult(ok=True, content=_truncate(content), summary=f"searched for '{args['pattern']}'")
 
 
+def _find_files(args: dict, ctx: ToolContext) -> ToolResult:
+    content = filesystem.find_files(ctx.root, args["pattern"], args.get("path", "."))
+    return ToolResult(ok=True, content=_truncate(content), summary=f"found files matching '{args['pattern']}'")
+
+
 def _search_semantic(args: dict, ctx: ToolContext) -> ToolResult:
     from lydia.context import retriever
 
@@ -171,6 +193,18 @@ def _edit_file(args: dict, ctx: ToolContext) -> ToolResult:
         ctx.root, path, args["old_string"], args["new_string"], args.get("replace_all", False),
     )
     approved = _confirm_or_auto(ctx, ConfirmRequest(title=f"Edit {path}", detail=proposal.diff))
+    if not approved:
+        return _declined(f"editing {path}")
+    message = filesystem.apply_write(ctx.root, proposal)
+    return ToolResult(ok=True, content=message, summary=message)
+
+
+def _multi_edit_file(args: dict, ctx: ToolContext) -> ToolResult:
+    path, edits = args["path"], args["edits"]
+    proposal = filesystem.propose_multi_edit(ctx.root, path, edits)
+    approved = _confirm_or_auto(
+        ctx, ConfirmRequest(title=f"Edit {path} ({len(edits)} changes)", detail=proposal.diff),
+    )
     if not approved:
         return _declined(f"editing {path}")
     message = filesystem.apply_write(ctx.root, proposal)
@@ -264,6 +298,31 @@ def _remember(args: dict, ctx: ToolContext) -> ToolResult:
     return ToolResult(ok=True, content=message, summary=message)
 
 
+# -- task checklist (ephemeral, not persisted) -------------------------------
+
+_TODO_GLYPHS = {"pending": "[ ]", "in_progress": "[~]", "completed": "[x]"}
+
+
+def _render_todos(todos: list[Todo]) -> str:
+    if not todos:
+        return "(no todos)"
+    return "\n".join(f"{_TODO_GLYPHS[t.status]} {t.content}" for t in todos)
+
+
+def _update_todos(args: dict, ctx: ToolContext) -> ToolResult:
+    items = args["todos"]
+    parsed: list[Todo] = []
+    for item in items:
+        status = item.get("status")
+        if status not in _TODO_GLYPHS:
+            raise ToolError(f"Invalid todo status '{status}'. Use one of: pending, in_progress, completed.")
+        parsed.append(Todo(content=item["content"], status=status))
+    ctx.todos.clear()
+    ctx.todos.extend(parsed)
+    rendered = _render_todos(ctx.todos)
+    return ToolResult(ok=True, content=rendered, summary=rendered)
+
+
 # -- personal assistant ------------------------------------------------------
 # Connector modules (Gmail/Outlook/Canvas/yfinance/feedparser) are imported
 # lazily inside each handler, same pattern as _search_semantic above, so
@@ -353,7 +412,10 @@ def _check_news(args: dict, ctx: ToolContext) -> ToolResult:
 # these out of the registry, regardless of risk tier — git_add is "safe"
 # risk (no confirmation needed) but still mutates the index, so risk tier
 # alone isn't the right signal for "should this even be offered in plan mode."
-MUTATING_TOOL_NAMES = {"write_file", "edit_file", "delete_file", "run_command", "git_add", "git_commit", "git_push"}
+MUTATING_TOOL_NAMES = {
+    "write_file", "edit_file", "multi_edit_file", "delete_file",
+    "run_command", "git_add", "git_commit", "git_push",
+}
 
 
 def filter_for_mode(registry: list[ToolSpec], mode: str) -> list[ToolSpec]:
@@ -399,6 +461,21 @@ def build_registry() -> list[ToolSpec]:
                 "required": ["pattern"],
             },
             "safe", _search_code,
+        ),
+        ToolSpec(
+            "find_files",
+            "Find files by name/path pattern (e.g. '*.py', 'test_*.py'), not by content — "
+            "use search_code for content. Pattern matching isn't path-segment-aware, so "
+            "'*.py' matches nested paths too (e.g. src/foo.py).",
+            {
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Filename/path glob pattern, e.g. '*.py'"},
+                    "path": {"type": "string", "description": "Restrict search to this directory, default '.'"},
+                },
+                "required": ["pattern"],
+            },
+            "safe", _find_files,
         ),
         ToolSpec(
             "search_semantic",
@@ -453,6 +530,38 @@ def build_registry() -> list[ToolSpec]:
                 "required": ["path", "old_string", "new_string"],
             },
             "confirm", _edit_file,
+        ),
+        ToolSpec(
+            "multi_edit_file",
+            "Apply several find/replace edits to one existing file in a single call — "
+            "preferred over multiple edit_file calls when making several distinct changes "
+            "to the same file, since it shows one diff and asks for one approval instead "
+            "of several. Edits are applied in order, each against the result of the one "
+            "before it, so a later edit can target text introduced by an earlier one.",
+            {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Path relative to the project root"},
+                    "edits": {
+                        "type": "array",
+                        "description": "Edits to apply in order",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "old_string": {"type": "string", "description": "The exact existing text to replace"},
+                                "new_string": {"type": "string", "description": "The text to replace it with"},
+                                "replace_all": {
+                                    "type": "boolean",
+                                    "description": "Replace every occurrence of old_string instead of requiring exactly one",
+                                },
+                            },
+                            "required": ["old_string", "new_string"],
+                        },
+                    },
+                },
+                "required": ["path", "edits"],
+            },
+            "confirm", _multi_edit_file,
         ),
         ToolSpec(
             "delete_file", "Permanently delete a file (a backup is kept). Asks the user to approve first.",
@@ -528,6 +637,34 @@ def build_registry() -> list[ToolSpec]:
                 "required": ["fact"],
             },
             "safe", _remember,
+        ),
+        ToolSpec(
+            "update_todos",
+            "Show a visible, updatable checklist for a multi-step task (roughly 3+ "
+            "distinct steps) so progress is visible as you work — especially useful "
+            "in auto mode, where there's no per-step confirmation prompt. Not for "
+            "trivial one-shot requests. Always send the FULL current list, not just "
+            "what changed — this call replaces the whole checklist.",
+            {
+                "type": "object",
+                "properties": {
+                    "todos": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "content": {"type": "string", "description": "The task, as a short standalone statement"},
+                                "status": {
+                                    "type": "string", "enum": ["pending", "in_progress", "completed"],
+                                },
+                            },
+                            "required": ["content", "status"],
+                        },
+                    },
+                },
+                "required": ["todos"],
+            },
+            "safe", _update_todos,
         ),
         ToolSpec(
             "check_email",

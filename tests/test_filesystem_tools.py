@@ -8,8 +8,10 @@ from lydia.tools.filesystem import (
     ToolError,
     apply_delete,
     apply_write,
+    find_files,
     list_dir,
     propose_edit,
+    propose_multi_edit,
     propose_write,
     read_file,
     search_code,
@@ -172,3 +174,88 @@ def test_propose_edit_blocked_outside_root(tmp_path: Path) -> None:
 
     with pytest.raises(PathEscapesProjectError):
         propose_edit(tmp_path, "../escape.py", "x", "y")
+
+
+def test_propose_multi_edit_applies_sequentially(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text("def foo():\n    return 1\n")
+    proposal = propose_multi_edit(tmp_path, "a.py", [
+        {"old_string": "def foo():", "new_string": "def bar():"},
+        {"old_string": "return 1", "new_string": "return 2"},
+    ])
+    assert proposal.new_content == "def bar():\n    return 2\n"
+
+
+def test_propose_multi_edit_second_edit_depends_on_first(tmp_path: Path) -> None:
+    # The second edit's old_string only exists *after* the first edit runs —
+    # proves edits apply sequentially, not all against the pristine original.
+    (tmp_path / "a.py").write_text("x = 1\n")
+    proposal = propose_multi_edit(tmp_path, "a.py", [
+        {"old_string": "x = 1", "new_string": "x = 2"},
+        {"old_string": "x = 2", "new_string": "x = 3"},
+    ])
+    assert proposal.new_content == "x = 3\n"
+
+
+def test_propose_multi_edit_empty_list_raises(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text("hi\n")
+    with pytest.raises(ToolError):
+        propose_multi_edit(tmp_path, "a.py", [])
+
+
+def test_propose_multi_edit_missing_file_raises(tmp_path: Path) -> None:
+    with pytest.raises(ToolError):
+        propose_multi_edit(tmp_path, "nope.py", [{"old_string": "x", "new_string": "y"}])
+
+
+def test_propose_multi_edit_failure_names_the_edit_index(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text("x = 1\n")
+    with pytest.raises(ToolError, match=r"edit #2"):
+        propose_multi_edit(tmp_path, "a.py", [
+            {"old_string": "x = 1", "new_string": "x = 2"},
+            {"old_string": "nonexistent", "new_string": "y"},
+        ])
+
+
+def test_propose_multi_edit_replace_all_within_one_edit(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text("x = 1\nx = 1\n")
+    proposal = propose_multi_edit(tmp_path, "a.py", [
+        {"old_string": "x = 1", "new_string": "x = 2", "replace_all": True},
+    ])
+    assert proposal.new_content == "x = 2\nx = 2\n"
+
+
+def test_propose_multi_edit_blocked_outside_root(tmp_path: Path) -> None:
+    from lydia.tools.paths import PathEscapesProjectError
+
+    with pytest.raises(PathEscapesProjectError):
+        propose_multi_edit(tmp_path, "../escape.py", [{"old_string": "x", "new_string": "y"}])
+
+
+def test_find_files_matches_pattern(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text("x")
+    (tmp_path / "b.py").write_text("x")
+    (tmp_path / "c.txt").write_text("x")
+    result = find_files(tmp_path, "*.py")
+    assert "a.py" in result
+    assert "b.py" in result
+    assert "c.txt" not in result
+
+
+def test_find_files_matches_nested_paths_quirk(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "foo.py").write_text("x")
+    result = find_files(tmp_path, "*.py")
+    assert "src/foo.py" in result
+
+
+def test_find_files_no_matches(tmp_path: Path) -> None:
+    (tmp_path / "a.txt").write_text("x")
+    result = find_files(tmp_path, "*.py")
+    assert "No files matching" in result
+
+
+def test_find_files_blocked_outside_root(tmp_path: Path) -> None:
+    from lydia.tools.paths import PathEscapesProjectError
+
+    with pytest.raises(PathEscapesProjectError):
+        find_files(tmp_path, "*.py", "../escape")

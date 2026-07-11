@@ -60,7 +60,21 @@ def test_init_is_idempotent(tmp_path: Path) -> None:
     runner.invoke(app, ["init"])
     result = runner.invoke(app, ["init"])
     assert result.exit_code == 0
-    assert "Already initialized" in result.stdout
+
+
+def test_init_suggests_verify_command_for_python_project(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n")
+    result = runner.invoke(app, ["init"])
+    assert result.exit_code == 0
+    assert "pytest -q" in result.stdout
+    config_file = tmp_path / ".lydia" / "config.json"
+    assert json.loads(config_file.read_text()) == {"verify_command": "pytest -q"}
+
+
+def test_init_no_guess_when_no_manifest_present(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["init"])
+    assert result.exit_code == 0
+    assert "No verify_command guessed" in result.stdout
 
 
 def test_config_show_reports_defaults() -> None:

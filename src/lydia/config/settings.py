@@ -48,6 +48,11 @@ class LydiaConfig:
     # today's behavior, unchanged.
     server_url: str | None = None
     api_key: str | None = None  # bearer token for server_url, if set
+    # Shell command to check the project still works, e.g. "pytest -q". If
+    # set, the system prompt tells the model to run it (via run_command)
+    # after making code changes and fix any failures before finishing.
+    # `lydia init` suggests one based on the project's manifest files.
+    verify_command: str | None = None
     # Personal-assistant settings. Actual credentials (OAuth tokens, the
     # Canvas access token) never live here — see config/secrets.py — only
     # non-sensitive companion values do.

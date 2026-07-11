@@ -18,7 +18,8 @@ You have tools to read and search the project, edit/write/delete files, run
 shell commands, and drive git (status/diff/add/commit/push). Rules for
 using them:
 - Look before you leap: read or search relevant files before editing them,
-  rather than guessing at their contents. Use search_code when you know the
+  rather than guessing at their contents. Use find_files when you know a
+  filename pattern but not its location; search_code when you know the
   literal text to look for; use search_semantic for "where is X handled"
   questions where you don't know the exact wording — but only if it says
   it's indexed, otherwise fall back to search_code and list_dir.
@@ -27,7 +28,9 @@ using them:
   one exact snippet of text, so you don't have to reproduce the whole file.
   Use write_file only for new files or a genuine full-file rewrite; it
   replaces the entire file's contents, so include everything, not a
-  fragment.
+  fragment. If a single file needs several distinct changes, use
+  multi_edit_file instead of several edit_file calls — one diff, one
+  approval, applied in order.
 - File writes/edits/deletes, commits, and pushes ask the user to approve
   first (unless the session is in auto mode, in which case only genuinely
   destructive actions still ask) — that confirmation is handled for you,
@@ -41,6 +44,11 @@ project to disk so it's still known in future sessions (tech stack,
 conventions, decisions, anything the user says to remember). Use it when the
 user tells you something worth persisting — don't use it for one-off task
 details that only matter for the current request.
+
+For a multi-step task (roughly 3+ distinct steps), use `update_todos` to keep
+a visible checklist: call it with the full list up front, then again with
+updated statuses as you complete each step — always send the whole list,
+not just what changed. Skip it for trivial one-shot requests.
 """
 
 
@@ -69,20 +77,29 @@ How to prioritize the checklist:
 PLAN_MODE_ADDENDUM = """\
 
 The session is currently in plan mode: you do not have write_file, edit_file,
-delete_file, run_command, git_add, git_commit, or git_push available right
-now — only read-only tools. Research thoroughly using the tools you do
-have, then present a clear, structured plan in your response (what you'd
-change and why). End by asking the user to switch modes (e.g. `/mode auto`
-or `/mode ask`) before you actually make any changes.
+multi_edit_file, delete_file, run_command, git_add, git_commit, or git_push
+available right now — only read-only tools. Research thoroughly using the
+tools you do have, then present a clear, structured plan in your response
+(what you'd change and why). End by asking the user to switch modes (e.g.
+`/mode auto` or `/mode ask`) before you actually make any changes.
 """
+
+
+def verify_addendum(verify_command: str) -> str:
+    return (
+        f"\nAfter making code changes, run `{verify_command}` via run_command "
+        "to check your work. If it fails, fix the issue and re-run it before "
+        "telling the user you're done — don't declare success on unverified changes.\n"
+    )
 
 
 def build_system_prompt(
     summary: ProjectSummary | None = None,
     facts: list[Fact] | None = None,
     mode: str = "ask",
+    verify_command: str | None = None,
 ) -> str:
-    """System prompt, optionally enriched with the project snapshot, remembered facts, and mode."""
+    """System prompt, optionally enriched with the project snapshot, remembered facts, mode, and verify command."""
     prompt = SYSTEM_PROMPT
     if summary is not None:
         languages = ", ".join(f"{name} {pct}%" for name, pct in summary.languages.items()) or "unknown"
@@ -98,6 +115,11 @@ def build_system_prompt(
     if facts:
         lines = "\n".join(f"- {fact.text}" for fact in facts)
         prompt += f"\nRemembered facts about this project (from earlier sessions):\n{lines}\n"
+    # Only relevant when run_command is actually available — in plan mode it
+    # isn't, and telling the model to run something it can't would just be
+    # confusing alongside the plan-mode addendum below.
+    if verify_command and mode != "plan":
+        prompt += verify_addendum(verify_command)
     if mode == "plan":
         prompt += PLAN_MODE_ADDENDUM
     return prompt

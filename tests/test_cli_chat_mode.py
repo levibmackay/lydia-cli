@@ -8,6 +8,7 @@ limitation for this REPL).
 
 from pathlib import Path
 
+from lydia.agent.tools import ToolContext, build_registry
 from lydia.cli.chat import VALID_MODES, ChatSession, _apply_mode, _handle_slash
 from lydia.config.settings import LydiaConfig
 
@@ -60,3 +61,19 @@ def test_send_rebuilds_system_prompt_for_current_mode(tmp_path: Path) -> None:
     session.config.mode = "plan"
     session.system_prompt = session._build_system_prompt()
     assert "plan mode" in session.system_prompt
+
+
+def test_session_todos_persist_across_turns_via_shared_reference(tmp_path: Path) -> None:
+    # Mirrors exactly what ChatSession.send() does: build a ToolContext with
+    # todos=self.todos (the same list object), so a handler's mutation this
+    # turn is visible on session.todos without any extra plumbing.
+    session = make_session(tmp_path)
+    update_todos = next(t for t in build_registry() if t.name == "update_todos")
+
+    ctx_turn_one = ToolContext(root=tmp_path, config=session.config, confirm=lambda req: True, todos=session.todos)
+    update_todos.handler({"todos": [{"content": "step 1", "status": "pending"}]}, ctx_turn_one)
+    assert len(session.todos) == 1
+
+    ctx_turn_two = ToolContext(root=tmp_path, config=session.config, confirm=lambda req: True, todos=session.todos)
+    update_todos.handler({"todos": [{"content": "step 1", "status": "completed"}]}, ctx_turn_two)
+    assert session.todos[0].status == "completed"

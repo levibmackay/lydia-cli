@@ -10,6 +10,7 @@ edit is always recoverable.
 from __future__ import annotations
 
 import difflib
+import fnmatch
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -98,6 +99,30 @@ def search_code(root: Path, pattern: str, path: str = ".", case_sensitive: bool 
     return "\n".join(matches) + suffix
 
 
+def find_files(root: Path, pattern: str, path: str = ".") -> str:
+    """Find files by name/path pattern (e.g. "*.py") under *path*.
+
+    Complements search_code (which matches file contents): this matches
+    file paths instead. Uses fnmatch, which is not path-segment-aware, so
+    "*.py" matches nested paths too (e.g. src/foo.py) — a convenient
+    default for "find every Python file" rather than a limitation.
+    """
+    target = resolve_within(root, path)
+    if not target.exists():
+        raise ToolError(f"No such path: {path}")
+    matches: list[str] = []
+    for file_path in _walk_files(target):
+        relative = str(file_path.relative_to(root))
+        if fnmatch.fnmatch(relative, pattern):
+            matches.append(relative)
+            if len(matches) >= MAX_SEARCH_MATCHES:
+                break
+    if not matches:
+        return f"No files matching '{pattern}' under {path}"
+    suffix = "\n(truncated)" if len(matches) >= MAX_SEARCH_MATCHES else ""
+    return "\n".join(sorted(matches)) + suffix
+
+
 def _walk_files(directory: Path):
     stack = [directory]
     while stack:
@@ -164,6 +189,40 @@ def propose_edit(root: Path, path: str, old_string: str, new_string: str, replac
     new_content = old_content.replace(old_string, new_string)
     diff = _unified_diff(old_content, new_content, path, is_new=False)
     return WriteProposal(path=path, diff=diff, is_new_file=False, old_content=old_content, new_content=new_content)
+
+
+def propose_multi_edit(root: Path, path: str, edits: list[dict]) -> WriteProposal:
+    """Build a diff for several sequential find/replace edits to one existing file.
+
+    Each edit is applied to the result of the previous one, not all against
+    the pristine original — matching Claude Code's own multi-edit tool. Any
+    failing edit aborts the whole batch before a diff is built, so there's
+    never a partially-applied result.
+    """
+    if not edits:
+        raise ToolError("edits must be a non-empty list.")
+    target = resolve_within(root, path)
+    if not target.is_file():
+        raise ToolError(f"No such file: {path}")
+    old_content = target.read_text(encoding="utf-8", errors="replace")
+    content = old_content
+    for i, edit in enumerate(edits, start=1):
+        old_string, new_string = edit["old_string"], edit["new_string"]
+        replace_all = edit.get("replace_all", False)
+        if old_string == new_string:
+            raise ToolError(f"edit #{i}: old_string and new_string are identical — no change to make.")
+        count = content.count(old_string)
+        if count == 0:
+            raise ToolError(f"edit #{i}: old_string not found. Re-read the file and match the text exactly.")
+        if count > 1 and not replace_all:
+            raise ToolError(
+                f"edit #{i}: old_string appears {count} times; it must be unique. "
+                "Add more surrounding context to pin down one occurrence, or pass replace_all=true "
+                "to replace every occurrence."
+            )
+        content = content.replace(old_string, new_string)
+    diff = _unified_diff(old_content, content, path, is_new=False)
+    return WriteProposal(path=path, diff=diff, is_new_file=False, old_content=old_content, new_content=content)
 
 
 def apply_write(root: Path, proposal: WriteProposal) -> str:

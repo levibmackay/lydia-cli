@@ -13,7 +13,7 @@ from lydia.agent import facts
 from lydia.agent.loop import run_agent_turn
 from lydia.agent.memory import SessionHistory
 from lydia.agent.prompts import build_system_prompt
-from lydia.agent.tools import ToolContext, build_registry, filter_for_mode
+from lydia.agent.tools import ToolContext, Todo, build_registry, filter_for_mode
 from lydia.cli import ui
 from lydia.config.settings import GLOBAL_DIR, LydiaConfig, find_project_root
 from lydia.context.scanner import ProjectSummary, scan_project
@@ -69,10 +69,11 @@ class ChatSession:
         self.messages: list[Message] = []
         self.history = SessionHistory(project_root)
         self.registry = build_registry()
+        self.todos: list[Todo] = []
         self.system_prompt = self._build_system_prompt()
 
     def _build_system_prompt(self) -> str:
-        return build_system_prompt(self.summary, self.facts, self.config.mode)
+        return build_system_prompt(self.summary, self.facts, self.config.mode, self.config.verify_command)
 
     def reset(self) -> None:
         self.messages.clear()
@@ -92,7 +93,9 @@ class ChatSession:
         self.messages.append(user_message)
         self.history.append(user_message)
         ui.console.print()  # blank line between the user's input and Lydia's response
-        ctx = ToolContext(root=self.root, config=self.config, confirm=ui.confirm, client=self.client)
+        ctx = ToolContext(
+            root=self.root, config=self.config, confirm=ui.confirm, client=self.client, todos=self.todos,
+        )
         try:
             reply, stats = run_agent_turn(
                 client=self.client,

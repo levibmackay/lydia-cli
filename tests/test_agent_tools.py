@@ -178,6 +178,54 @@ def test_edit_file_replace_all(tmp_path: Path) -> None:
     assert (tmp_path / "a.py").read_text() == "x = 2\nx = 2\n"
 
 
+# -- multi_edit_file ------------------------------------------------------
+
+
+def test_multi_edit_file_declined_does_not_touch_disk(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text("x = 1\n")
+    result = get("multi_edit_file").handler(
+        {"path": "a.py", "edits": [{"old_string": "x = 1", "new_string": "x = 2"}]},
+        ctx(tmp_path, confirm_result=False),
+    )
+    assert not result.ok
+    assert (tmp_path / "a.py").read_text() == "x = 1\n"
+
+
+def test_multi_edit_file_approved_applies_edits_in_order(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text("x = 1\n")
+    result = get("multi_edit_file").handler(
+        {
+            "path": "a.py",
+            "edits": [
+                {"old_string": "x = 1", "new_string": "x = 2"},
+                {"old_string": "x = 2", "new_string": "x = 3"},
+            ],
+        },
+        ctx(tmp_path, confirm_result=True),
+    )
+    assert result.ok
+    assert (tmp_path / "a.py").read_text() == "x = 3\n"
+
+
+def test_multi_edit_file_bad_edit_reports_error(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text("x = 1\n")
+    with pytest.raises(ToolError, match="edit #1"):
+        get("multi_edit_file").handler(
+            {"path": "a.py", "edits": [{"old_string": "nope", "new_string": "y"}]}, ctx(tmp_path),
+        )
+
+
+def test_multi_edit_file_auto_mode_skips_confirm(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text("x = 1\n")
+    asked = []
+    context = ToolContext(root=tmp_path, config=LydiaConfig(mode="auto"), confirm=lambda req: asked.append(req) or True)
+    result = get("multi_edit_file").handler(
+        {"path": "a.py", "edits": [{"old_string": "x = 1", "new_string": "x = 2"}]}, context,
+    )
+    assert result.ok
+    assert asked == []
+
+
 # -- auto mode: skip confirm unless dangerous ----------------------------
 
 
@@ -251,3 +299,52 @@ def test_filter_for_mode_ask_and_auto_keep_everything() -> None:
     all_names = {spec.name for spec in registry}
     assert {spec.name for spec in filter_for_mode(registry, "ask")} == all_names
     assert {spec.name for spec in filter_for_mode(registry, "auto")} == all_names
+
+
+def test_update_todos_stays_available_in_plan_mode() -> None:
+    filtered_names = {spec.name for spec in filter_for_mode(build_registry(), "plan")}
+    assert "update_todos" in filtered_names
+
+
+# -- update_todos ---------------------------------------------------------
+
+
+def test_update_todos_replaces_full_list(tmp_path: Path) -> None:
+    result = get("update_todos").handler(
+        {"todos": [{"content": "step 1", "status": "pending"}, {"content": "step 2", "status": "pending"}]},
+        ctx(tmp_path),
+    )
+    assert result.ok
+    assert "step 1" in result.content
+    assert "step 2" in result.content
+
+
+def test_update_todos_second_call_replaces_not_appends(tmp_path: Path) -> None:
+    context = ctx(tmp_path)
+    get("update_todos").handler({"todos": [{"content": "step 1", "status": "pending"}]}, context)
+    get("update_todos").handler({"todos": [{"content": "step 1", "status": "completed"}]}, context)
+    assert len(context.todos) == 1
+    assert context.todos[0].status == "completed"
+
+
+def test_update_todos_invalid_status_raises(tmp_path: Path) -> None:
+    with pytest.raises(ToolError):
+        get("update_todos").handler(
+            {"todos": [{"content": "step 1", "status": "not-a-status"}]}, ctx(tmp_path),
+        )
+
+
+def test_find_files_handler(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text("x")
+    result = get("find_files").handler({"pattern": "*.py"}, ctx(tmp_path))
+    assert result.ok
+    assert "a.py" in result.content
+
+
+def test_update_todos_default_is_empty_and_ephemeral(tmp_path: Path) -> None:
+    # Two independent ToolContexts (as non-interactive callers would create)
+    # never see each other's todos — only a shared list reference does.
+    first = ctx(tmp_path)
+    get("update_todos").handler({"todos": [{"content": "x", "status": "pending"}]}, first)
+    second = ctx(tmp_path)
+    assert second.todos == []

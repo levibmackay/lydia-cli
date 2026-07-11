@@ -222,6 +222,24 @@ def models() -> None:
     ui.console.print(table)
 
 
+VERIFY_COMMAND_GUESSES = {
+    "pyproject.toml": "pytest -q",
+    "package.json": "npm test",
+    "Cargo.toml": "cargo test",
+    "go.mod": "go test ./...",
+}
+
+
+def _guess_verify_command(manifest_files: list[str]) -> str | None:
+    """A verify_command suggestion if exactly one recognized manifest type is present."""
+    matches = {
+        VERIFY_COMMAND_GUESSES[Path(name).name]
+        for name in manifest_files
+        if Path(name).name in VERIFY_COMMAND_GUESSES
+    }
+    return matches.pop() if len(matches) == 1 else None
+
+
 @app.command()
 def init() -> None:
     """Create a .lydia/ directory in the current project."""
@@ -231,10 +249,19 @@ def init() -> None:
         ui.print_info(f"Already initialized: {config_file}")
         return
     config_file.parent.mkdir(parents=True, exist_ok=True)
-    config_file.write_text(json.dumps({}, indent=2) + "\n", encoding="utf-8")
+    guessed = _guess_verify_command(scan_project(root).manifest_files)
+    config_data = {"verify_command": guessed} if guessed else {}
+    config_file.write_text(json.dumps(config_data, indent=2) + "\n", encoding="utf-8")
     gitignore = config_file.parent / ".gitignore"
     gitignore.write_text("history/\nbackups/\nindex.sqlite3\n", encoding="utf-8")
     ui.print_info(f"Initialized {config_file.parent}/ (history/, backups/, and index.sqlite3 are git-ignored)")
+    if guessed:
+        ui.print_info(f"Suggested verify_command: {guessed} — edit or clear it in {config_file} if that's not right.")
+    else:
+        ui.print_info(
+            "No verify_command guessed. Set one with `lydia config set verify_command \"...\" --project` "
+            "if you want Lydia to run tests/lint after making changes."
+        )
 
 
 @config_app.command("show")

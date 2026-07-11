@@ -16,7 +16,7 @@ from lydia.llm.types import ChatChunk, Message, ToolCall
 from lydia.tools.filesystem import ToolError
 from lydia.tools.paths import PathEscapesProjectError
 
-MAX_TOOL_ITERATIONS = 8
+MAX_TOOL_ITERATIONS = 25
 
 StreamFn = Callable[[Iterator[ChatChunk]], "StreamResult"]
 ToolCallHook = Callable[[ToolCall], None]

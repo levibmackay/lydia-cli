@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from lydia.agent.loop import default_stream_fn, run_agent_turn
+from lydia.agent.loop import MAX_TOOL_ITERATIONS, default_stream_fn, run_agent_turn
 from lydia.agent.tools import ToolContext, ToolResult, ToolSpec, build_registry
 from lydia.config.settings import LydiaConfig
 from lydia.llm.types import ChatChunk, Message, ToolCall
@@ -117,7 +117,7 @@ def test_handler_exception_becomes_tool_error_not_crash(tmp_path: Path) -> None:
 
 def test_stops_after_max_iterations(tmp_path: Path) -> None:
     loop_forever = [ChatChunk(tool_calls=[ToolCall(name="git_status", arguments={})], done=True)]
-    client = FakeClient([loop_forever] * 10)
+    client = FakeClient([loop_forever] * (MAX_TOOL_ITERATIONS + 2))
     messages: list[Message] = [Message(role="user", content="loop")]
     reply, _ = run_agent_turn(
         client=client, model="m", temperature=0.7, num_ctx=8192, think=None,
@@ -125,4 +125,4 @@ def test_stops_after_max_iterations(tmp_path: Path) -> None:
         ctx=make_ctx(tmp_path), stream_fn=default_stream_fn,
     )
     assert "stopped" in reply.lower()
-    assert len(client.calls) == 8  # MAX_TOOL_ITERATIONS
+    assert len(client.calls) == MAX_TOOL_ITERATIONS

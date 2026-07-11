@@ -30,3 +30,20 @@ def test_plan_mode_appends_addendum() -> None:
 def test_ask_and_auto_mode_do_not_append_plan_addendum() -> None:
     assert "plan mode" not in build_system_prompt(mode="ask")
     assert "plan mode" not in build_system_prompt(mode="auto")
+
+
+def test_verify_command_appended_when_set() -> None:
+    prompt = build_system_prompt(mode="ask", verify_command="pytest -q")
+    assert "pytest -q" in prompt
+    assert "run_command" in prompt
+
+
+def test_verify_command_absent_by_default() -> None:
+    assert "run_command" not in build_system_prompt(mode="ask")
+
+
+def test_verify_command_suppressed_in_plan_mode() -> None:
+    # Telling the model to run something via run_command while also saying
+    # run_command isn't available would be self-contradictory.
+    prompt = build_system_prompt(mode="plan", verify_command="pytest -q")
+    assert "pytest -q" not in prompt
