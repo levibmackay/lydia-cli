@@ -1,5 +1,7 @@
 """Tests for the Gmail connector using a fake googleapiclient-shaped service."""
 
+from __future__ import annotations
+
 import pytest
 from googleapiclient.errors import HttpError
 

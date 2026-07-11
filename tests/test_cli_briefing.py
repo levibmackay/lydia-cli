@@ -54,6 +54,13 @@ def isolated_briefing_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> P
     return fake_file
 
 
+@pytest.fixture(autouse=True)
+def _use_fake_keyring(fake_keyring) -> None:
+    # _gather_sources reaches check_canvas/check_email, which read secrets
+    # via lydia.config.secrets — must never touch the real OS keychain here.
+    pass
+
+
 def test_gather_sources_includes_all_five_sections(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import lydia.connectors.news as news_mod
     import lydia.connectors.stocks as stocks_mod

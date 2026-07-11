@@ -2,8 +2,17 @@
 
 from pathlib import Path
 
+import pytest
+
 from lydia.agent.tools import ToolContext, build_registry
 from lydia.config.settings import LydiaConfig
+
+
+@pytest.fixture(autouse=True)
+def _use_fake_keyring(fake_keyring) -> None:
+    # check_canvas/check_email read secrets via lydia.config.secrets — must
+    # never touch the real OS keychain here.
+    pass
 
 
 def get(name: str):
