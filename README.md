@@ -350,7 +350,7 @@ lydia-cli/
 │   ├── database/    SQLite storage for the semantic index
 │   └── config/      layered JSON settings + OS-keychain-backed secrets
 │
-└── server/        optional: FastAPI inference proxy for a remote/GPU
+└── server/         optional: FastAPI inference proxy for a remote/GPU
                     Ollama — see "Running Lydia Server" above. Tool
                     execution never happens here; only inference does.
 ```
