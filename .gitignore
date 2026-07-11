@@ -6,6 +6,6 @@ dist/
 build/
 .pytest_cache/
 .coverage
-.tessa/history/
-.tessa/backups/
-.tessa/index.sqlite3
+.lydia/history/
+.lydia/backups/
+.lydia/index.sqlite3

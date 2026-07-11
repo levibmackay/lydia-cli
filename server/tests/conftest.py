@@ -7,11 +7,11 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
-from tessa.llm.types import ChatChunk, Message, ModelInfo
+from lydia.llm.types import ChatChunk, Message, ModelInfo
 
-from tessa_server.api.v1 import get_provider
-from tessa_server.config.settings import ServerSettings, get_settings
-from tessa_server.main import create_app
+from lydia_server.api.v1 import get_provider
+from lydia_server.config.settings import ServerSettings, get_settings
+from lydia_server.main import create_app
 
 
 class FakeProvider:

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from tessa.tools.filesystem import (
+from lydia.tools.filesystem import (
     ToolError,
     apply_delete,
     apply_write,
@@ -72,7 +72,7 @@ def test_apply_write_creates_file_and_backup_on_overwrite(tmp_path: Path) -> Non
     proposal = propose_write(tmp_path, "a.py", "new\n")
     apply_write(tmp_path, proposal)
     assert (tmp_path / "a.py").read_text() == "new\n"
-    backups = list((tmp_path / ".tessa" / "backups").glob("*/a.py"))
+    backups = list((tmp_path / ".lydia" / "backups").glob("*/a.py"))
     assert len(backups) == 1
     assert backups[0].read_text() == "old\n"
 
@@ -81,7 +81,7 @@ def test_apply_delete_backs_up_and_removes(tmp_path: Path) -> None:
     (tmp_path / "a.py").write_text("content\n")
     apply_delete(tmp_path, "a.py")
     assert not (tmp_path / "a.py").exists()
-    backups = list((tmp_path / ".tessa" / "backups").glob("*/a.py"))
+    backups = list((tmp_path / ".lydia" / "backups").glob("*/a.py"))
     assert len(backups) == 1
 
 
@@ -94,14 +94,14 @@ def test_backups_dont_collide_across_directories(tmp_path: Path) -> None:
     apply_write(tmp_path, propose_write(tmp_path, "src/utils.py", "src v2\n"))
     apply_write(tmp_path, propose_write(tmp_path, "tests/utils.py", "tests v2\n"))
 
-    from tessa.tools.filesystem import list_backups
+    from lydia.tools.filesystem import list_backups
     entries = list_backups(tmp_path)
     paths = sorted(e.path for e in entries)
     assert paths == ["src/utils.py", "tests/utils.py"]
 
 
 def test_list_and_restore_backup(tmp_path: Path) -> None:
-    from tessa.tools.filesystem import list_backups, restore_backup
+    from lydia.tools.filesystem import list_backups, restore_backup
 
     (tmp_path / "a.py").write_text("original\n")
     apply_write(tmp_path, propose_write(tmp_path, "a.py", "modified\n"))
@@ -117,12 +117,12 @@ def test_list_and_restore_backup(tmp_path: Path) -> None:
 
 
 def test_list_backups_empty_when_none_exist(tmp_path: Path) -> None:
-    from tessa.tools.filesystem import list_backups
+    from lydia.tools.filesystem import list_backups
     assert list_backups(tmp_path) == []
 
 
 def test_write_blocked_outside_root(tmp_path: Path) -> None:
-    from tessa.tools.paths import PathEscapesProjectError
+    from lydia.tools.paths import PathEscapesProjectError
 
     with pytest.raises(PathEscapesProjectError):
         propose_write(tmp_path, "../escape.py", "x")

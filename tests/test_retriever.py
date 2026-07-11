@@ -2,9 +2,9 @@
 
 from pathlib import Path
 
-from tessa.context.indexer import Chunk
-from tessa.context.retriever import is_indexed, search
-from tessa.database import sqlite as db
+from lydia.context.indexer import Chunk
+from lydia.context.retriever import is_indexed, search
+from lydia.database import sqlite as db
 
 
 class FakeEmbedClient:

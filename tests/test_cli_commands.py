@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from tessa import __version__
-from tessa.cli.main import app
+from lydia import __version__
+from lydia.cli.main import app
 
 runner = CliRunner()
 
@@ -47,10 +47,10 @@ def test_analyze_missing_directory_fails() -> None:
 def test_init_creates_project_config(tmp_path: Path) -> None:
     result = runner.invoke(app, ["init"])
     assert result.exit_code == 0
-    config_file = tmp_path / ".tessa" / "config.json"
+    config_file = tmp_path / ".lydia" / "config.json"
     assert config_file.exists()
     assert json.loads(config_file.read_text()) == {}
-    gitignore = (tmp_path / ".tessa" / ".gitignore").read_text()
+    gitignore = (tmp_path / ".lydia" / ".gitignore").read_text()
     assert "history/" in gitignore
     assert "backups/" in gitignore
     assert "index.sqlite3" in gitignore
@@ -71,7 +71,7 @@ def test_config_show_reports_defaults() -> None:
 
 def test_config_set_and_show_global(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     fake_home = tmp_path / "home"
-    monkeypatch.setattr("tessa.config.settings.GLOBAL_DIR", fake_home / ".tessa")
+    monkeypatch.setattr("lydia.config.settings.GLOBAL_DIR", fake_home / ".lydia")
     set_result = runner.invoke(app, ["config", "set", "temperature", "0.3"])
     assert set_result.exit_code == 0
     show_result = runner.invoke(app, ["config", "show"])
@@ -101,7 +101,7 @@ def test_restore_apply_invalid_index_fails(tmp_path: Path) -> None:
 
 
 def test_restore_list_and_apply(tmp_path: Path) -> None:
-    from tessa.tools.filesystem import apply_write, propose_write
+    from lydia.tools.filesystem import apply_write, propose_write
 
     (tmp_path / "a.py").write_text("original\n")
     apply_write(tmp_path, propose_write(tmp_path, "a.py", "modified\n"))

@@ -1,8 +1,8 @@
 """Both concrete clients must satisfy the ModelClient protocol structurally."""
 
-from tessa.llm.client import OllamaClient
-from tessa.llm.protocol import ModelClient
-from tessa.llm.remote_client import RemoteClient
+from lydia.llm.client import OllamaClient
+from lydia.llm.protocol import ModelClient
+from lydia.llm.remote_client import RemoteClient
 
 
 def test_ollama_client_satisfies_model_client() -> None:

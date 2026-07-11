@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from tessa.tools.terminal import classify_command, run_command
+from lydia.tools.terminal import classify_command, run_command
 
 
 def test_safe_commands() -> None:

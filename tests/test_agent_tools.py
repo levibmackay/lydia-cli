@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from tessa.agent.tools import ToolContext, build_registry
-from tessa.config.settings import TessaConfig
+from lydia.agent.tools import ToolContext, build_registry
+from lydia.config.settings import LydiaConfig
 
 
 def get(name: str):
@@ -13,7 +13,7 @@ def get(name: str):
 
 
 def ctx(tmp_path: Path, confirm_result: bool = True, permission_mode: str = "ask") -> ToolContext:
-    config = TessaConfig(permission_mode=permission_mode)
+    config = LydiaConfig(permission_mode=permission_mode)
     return ToolContext(root=tmp_path, config=config, confirm=lambda req: confirm_result)
 
 
@@ -50,7 +50,7 @@ def test_run_command_deny_mode_never_executes(tmp_path: Path) -> None:
     calls = []
     context = ToolContext(
         root=tmp_path,
-        config=TessaConfig(permission_mode="deny"),
+        config=LydiaConfig(permission_mode="deny"),
         confirm=lambda req: calls.append(req) or True,
     )
     result = get("run_command").handler({"command": "echo hi"}, context)
@@ -62,7 +62,7 @@ def test_run_command_auto_mode_runs_safe_without_confirm(tmp_path: Path) -> None
     asked = []
     context = ToolContext(
         root=tmp_path,
-        config=TessaConfig(permission_mode="auto"),
+        config=LydiaConfig(permission_mode="auto"),
         confirm=lambda req: asked.append(req) or True,
     )
     result = get("run_command").handler({"command": "echo hi"}, context)
@@ -74,7 +74,7 @@ def test_run_command_auto_mode_still_confirms_dangerous(tmp_path: Path) -> None:
     asked = []
     context = ToolContext(
         root=tmp_path,
-        config=TessaConfig(permission_mode="auto"),
+        config=LydiaConfig(permission_mode="auto"),
         confirm=lambda req: asked.append(req) or True,
     )
     get("run_command").handler({"command": "rm -rf ./build"}, context)
@@ -86,7 +86,7 @@ def test_run_command_ask_mode_confirms_even_safe_commands(tmp_path: Path) -> Non
     asked = []
     context = ToolContext(
         root=tmp_path,
-        config=TessaConfig(permission_mode="ask"),
+        config=LydiaConfig(permission_mode="ask"),
         confirm=lambda req: asked.append(req) or True,
     )
     get("run_command").handler({"command": "echo hi"}, context)
@@ -96,12 +96,12 @@ def test_run_command_ask_mode_confirms_even_safe_commands(tmp_path: Path) -> Non
 def test_search_semantic_reports_not_indexed(tmp_path: Path) -> None:
     result = get("search_semantic").handler({"query": "auth logic"}, ctx(tmp_path))
     assert not result.ok
-    assert "tessa index" in result.content
+    assert "lydia index" in result.content
 
 
 def test_search_semantic_returns_results_when_indexed(tmp_path: Path) -> None:
-    from tessa.context.indexer import Chunk
-    from tessa.database import sqlite as db
+    from lydia.context.indexer import Chunk
+    from lydia.database import sqlite as db
 
     conn = db.connect(tmp_path)
     db.insert_chunks(conn, [Chunk(path="auth.py", start_line=1, end_line=5, text="def login(): ...", content_hash="h")], [[1.0, 0.0]])
@@ -112,14 +112,14 @@ def test_search_semantic_returns_results_when_indexed(tmp_path: Path) -> None:
         def embed(self, model: str, inputs: list[str]) -> list[list[float]]:
             return [[1.0, 0.0] for _ in inputs]
 
-    context = ToolContext(root=tmp_path, config=TessaConfig(), confirm=lambda req: True, client=FakeClient())
+    context = ToolContext(root=tmp_path, config=LydiaConfig(), confirm=lambda req: True, client=FakeClient())
     result = get("search_semantic").handler({"query": "login handling"}, context)
     assert result.ok
     assert "auth.py" in result.content
 
 
 def test_remember_tool_is_safe_and_persists(tmp_path: Path) -> None:
-    from tessa.agent.facts import load_facts
+    from lydia.agent.facts import load_facts
 
     result = get("remember").handler({"fact": "uses PostgreSQL"}, ctx(tmp_path, confirm_result=False))
     assert result.ok

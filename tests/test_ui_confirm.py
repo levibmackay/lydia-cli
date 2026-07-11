@@ -1,7 +1,7 @@
-"""Tests for the non-interactive auto_confirm used by `tessa ask --yes`."""
+"""Tests for the non-interactive auto_confirm used by `lydia ask --yes`."""
 
-from tessa.agent.tools import ConfirmRequest
-from tessa.cli.ui import auto_confirm
+from lydia.agent.tools import ConfirmRequest
+from lydia.cli.ui import auto_confirm
 
 
 def test_auto_confirm_approves_non_dangerous() -> None:

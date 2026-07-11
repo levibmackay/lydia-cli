@@ -4,8 +4,8 @@ from pathlib import Path
 
 import numpy as np
 
-from tessa.context.indexer import Chunk
-from tessa.database import sqlite as db
+from lydia.context.indexer import Chunk
+from lydia.database import sqlite as db
 
 
 def make_chunk(path: str = "a.py", start: int = 1, end: int = 5, text: str = "code", h: str = "hash1") -> Chunk:

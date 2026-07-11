@@ -4,16 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Tessa is a local AI coding agent CLI — a personal, API-key-free alternative to
+Lydia is a local AI coding agent CLI — a personal, API-key-free alternative to
 Claude Code / Cursor, built on top of a local [Ollama](https://ollama.com)
 daemon, with an optional FastAPI server (`server/`) so Ollama can run on a
 more powerful remote machine instead. It is a portfolio project for Levi
 (CS student), so code quality, tests, and a clean architecture matter more
 than shipping speed.
 
-This is a **two-package monorepo**: `src/tessa` (the CLI, always needed)
-and `server/tessa_server` (optional, a separate installable package that
-depends on `tessa` as a library). Both are typically installed into one
+This is a **two-package monorepo**: `src/lydia` (the CLI, always needed)
+and `server/lydia_server` (optional, a separate installable package that
+depends on `lydia` as a library). Both are typically installed into one
 shared venv for local dev.
 
 ## Commands
@@ -32,15 +32,15 @@ shared venv for local dev.
 # so run it from server/, not the repo root
 cd server && ../.venv/bin/pytest
 
-# Run the CLI itself (after install -e, `tessa` is also on PATH via a symlink
+# Run the CLI itself (after install -e, `lydia` is also on PATH via a symlink
 # into /opt/homebrew/bin)
-tessa                      # interactive chat REPL in the current project
-tessa ask "question"       # one-shot, no tools, good for smoke-testing the LLM layer
-tessa analyze              # project scanner output
-tessa config show
+lydia                      # interactive chat REPL in the current project
+lydia ask "question"       # one-shot, no tools, good for smoke-testing the LLM layer
+lydia analyze              # project scanner output
+lydia config show
 
-# Run the server locally (needs a TESSA_SERVER_TOKEN or it refuses to start)
-TESSA_SERVER_TOKEN=dev-token .venv/bin/tessa-server
+# Run the server locally (needs a LYDIA_SERVER_TOKEN or it refuses to start)
+LYDIA_SERVER_TOKEN=dev-token .venv/bin/lydia-server
 ```
 
 There is no separate lint/format command configured yet.
@@ -53,31 +53,31 @@ Ollama to be running. To manually exercise the real thing:
 
 ```bash
 ollama list                 # confirm a model is pulled; qwen3.5 variants are what's tested locally
-tessa config set think off  # qwen3 is a thinking model; off = much faster manual testing
+lydia config set think off  # qwen3 is a thinking model; off = much faster manual testing
 ```
 
 When testing the agent loop end-to-end (tool calls + confirmation prompts),
-piping input via `printf ... | tessa` is unreliable — Rich's `Confirm.ask`
+piping input via `printf ... | lydia` is unreliable — Rich's `Confirm.ask`
 and `prompt_toolkit` fight over a non-tty stdin and the confirm dialog will
 spuriously EOFError (it fails *safe*, i.e. auto-declines, so this looks like
 a bug but isn't one). If you need to script an end-to-end test of a
 confirmation flow, drive it through a real pty (see git history around the
 Milestone 3 commit for a working example using Python's `pty` module), not a
-plain pipe. `tessa ask "..." --yes` sidesteps this entirely for scripted
+plain pipe. `lydia ask "..." --yes` sidesteps this entirely for scripted
 end-to-end checks since it never needs a y/n prompt in the first place.
 
 To manually verify the client/server split end-to-end (not just
 `server/tests/`'s fake-provider unit tests): run a real server locally
-against the real local Ollama, point a `tessa` project config at it, and
+against the real local Ollama, point a `lydia` project config at it, and
 confirm both that it works *and* that the server's own log only shows
 `/v1/chat`/`/v1/models` traffic — never any file access — which is the
 actual proof that tool execution stayed client-side:
 
 ```bash
-TESSA_SERVER_TOKEN=dev-token .venv/bin/tessa-server &
-tessa config set server_url http://127.0.0.1:8000 --project
-tessa config set api_key dev-token --project
-tessa ask "read some_file.py and summarize it" --yes
+LYDIA_SERVER_TOKEN=dev-token .venv/bin/lydia-server &
+lydia config set server_url http://127.0.0.1:8000 --project
+lydia config set api_key dev-token --project
+lydia ask "read some_file.py and summarize it" --yes
 ```
 
 ## Architecture
@@ -87,14 +87,14 @@ Layering, outer to inner — each layer only depends on the ones below it:
 ```
 cli/     Typer commands + Rich rendering + prompt_toolkit REPL   (depends on: agent, llm, config, context)
 agent/   orchestration: system prompt, tool registry, the loop   (depends on: llm, tools, config)
-tools/   pure functions that touch the filesystem/shell/git      (depends on: nothing else in tessa)
-llm/     ModelClient protocol + OllamaClient + RemoteClient       (depends on: nothing else in tessa)
+tools/   pure functions that touch the filesystem/shell/git      (depends on: nothing else in lydia)
+llm/     ModelClient protocol + OllamaClient + RemoteClient       (depends on: nothing else in lydia)
 context/ project scanner + semantic index (chunk/embed/search)   (depends on: llm (embeddings), database
-database/ SQLite storage for the semantic index                  (depends on: nothing else in tessa)
-config/  layered JSON settings                                   (depends on: nothing else in tessa)
+database/ SQLite storage for the semantic index                  (depends on: nothing else in lydia)
+config/  layered JSON settings                                   (depends on: nothing else in lydia)
 
-server/  (separate package, tessa_server/) — FastAPI inference proxy.
-         Depends on tessa as a library (reuses OllamaClient directly as
+server/  (separate package, lydia_server/) — FastAPI inference proxy.
+         Depends on lydia as a library (reuses OllamaClient directly as
          its provider). Never touches tools/, agent/, or cli/ — tool
          execution always stays client-side. See server/README.md.
 ```
@@ -168,7 +168,7 @@ Ollama and passes the shape through): `build_chat_payload` (request body),
 inverse — `tests/test_client.py::test_serialize_chat_chunk_round_trips_through_parse_chat_line`
 pins this). If you change one, check whether the other needs to change too.
 
-`server/tessa_server/api/v1.py::get_provider` deliberately does *not* use a
+`server/lydia_server/api/v1.py::get_provider` deliberately does *not* use a
 FastAPI yield-dependency for the provider, even though that's the more
 idiomatic pattern for setup/teardown. For the streaming `/v1/chat` route, a
 yield-dependency's teardown runs as soon as the endpoint function returns
@@ -185,8 +185,8 @@ project root (`..`, absolute paths elsewhere). Don't bypass this by calling
 
 ### Config layering
 
-`config/settings.py::load_config` merges `~/.tessa/config.json` (global) then
-`<project>/.tessa/config.json` (project, found by walking up for a `.tessa/`
+`config/settings.py::load_config` merges `~/.lydia/config.json` (global) then
+`<project>/.lydia/config.json` (project, found by walking up for a `.lydia/`
 or `.git/` directory) — project wins. Unknown keys are ignored with a
 warning rather than erroring, so old config files don't break on upgrade.
 

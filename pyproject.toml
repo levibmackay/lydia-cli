@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "tessa"
+name = "lydia"
 version = "0.1.0"
-description = "Tessa — a local AI coding agent powered by Ollama. No API keys required."
+description = "Lydia — a local AI coding agent powered by Ollama. No API keys required."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -34,13 +34,13 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/levibmackay/tessa-cli"
+Repository = "https://github.com/levibmackay/lydia-cli"
 
 [project.scripts]
-tessa = "tessa.cli.main:main"
+lydia = "lydia.cli.main:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/tessa"]
+packages = ["src/lydia"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

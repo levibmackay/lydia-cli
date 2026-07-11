@@ -6,7 +6,7 @@ context — each one names the files to touch and what "done" looks like.
 
 ## Done
 
-- **M1 — Core CLI.** Typer commands (`tessa`, `ask`, `analyze`, `models`,
+- **M1 — Core CLI.** Typer commands (`lydia`, `ask`, `analyze`, `models`,
   `init`, `config show/set`), a `prompt_toolkit` REPL with history and slash
   commands, Rich streaming Markdown rendering, layered JSON config, model
   auto-selection preferring installed coder models, thinking-model support,
@@ -18,12 +18,12 @@ context — each one names the files to touch and what "done" looks like.
   require y/n approval; writes/deletes keep a timestamped backup. All
   filesystem tools refuse to touch paths outside the project root.
 - **M6 — Persistent project memory.** `agent/facts.py` stores a curated,
-  capped list of facts at `.tessa/memory.json` (separate from the raw
+  capped list of facts at `.lydia/memory.json` (separate from the raw
   session transcript in `agent/memory.py`, which is a log, not something fed
   back into future conversations). Facts are folded into the system prompt
   via `agent/prompts.py::build_system_prompt`. Three ways to add one: the
   model calling the `remember` tool mid-conversation, `/remember <fact>` /
-  `/memory` / `/forget <n>` slash commands in chat, or `tessa memory
+  `/memory` / `/forget <n>` slash commands in chat, or `lydia memory
   add/list/forget` outside of chat. Verified end-to-end: a fact added in one
   process is present in a fresh process's system prompt with no extra steps.
 - **CI.** `.github/workflows/test.yml` runs the full suite on Python
@@ -35,26 +35,26 @@ context — each one names the files to touch and what "done" looks like.
   blank line within a short lookahead, so boundaries usually land between
   functions) and embeds each one via Ollama (`nomic-embed-text`, 768-dim).
   `database/sqlite.py` stores chunks + embeddings as float32 blobs in
-  `.tessa/index.sqlite3`. Re-indexing is incremental — a file is only
+  `.lydia/index.sqlite3`. Re-indexing is incremental — a file is only
   re-embedded if its content hash changed since the last index. New safe
   tool `search_semantic` in `agent/tools.py`, offered alongside literal
-  `search_code`; it reports "not indexed yet" cleanly if `tessa index`
+  `search_code`; it reports "not indexed yet" cleanly if `lydia index`
   hasn't been run. Verified end-to-end: indexed a real project, confirmed
   incremental re-runs skip unchanged files and pick up changed/deleted
   ones, and confirmed the real agent loop (not just the retriever in
   isolation) chooses `search_semantic` correctly and gives the right
   answer against a live Ollama daemon, 3/3 runs.
-- **Undo command.** `tessa restore list` / `tessa restore apply <n>`.
+- **Undo command.** `lydia restore list` / `lydia restore apply <n>`.
   Fixed a real bug along the way — backups were previously named
   `{stamp}-{filename}` with no directory info, so two files with the same
   name in different directories (e.g. `src/utils.py` and `tests/utils.py`)
   would silently collide. Backups now live at
-  `.tessa/backups/{stamp}/{original/relative/path}`, mirroring the
+  `.lydia/backups/{stamp}/{original/relative/path}`, mirroring the
   project tree, so restoring is unambiguous.
-- **`--yes` / non-interactive mode.** `tessa ask "..." --yes` gives `ask`
+- **`--yes` / non-interactive mode.** `lydia ask "..." --yes` gives `ask`
   full tool access via `ui.auto_confirm`, which approves everything except
   tools/commands flagged dangerous (no human present to approve real
-  danger, so it fails safe rather than approving blindly). Plain `tessa
+  danger, so it fails safe rather than approving blindly). Plain `lydia
   ask` without `--yes` is unchanged — still tool-free chat.
 - **More CLI-level tests.** `tests/test_cli_commands.py` covers `analyze`,
   `init`, `config show/set`, `restore list/apply`, and `--version` via
@@ -72,7 +72,7 @@ context — each one names the files to touch and what "done" looks like.
   as "tested," and the distinction matters if you're about to rely on it.
 - **Client/server split.** New `server/` package (FastAPI) so Ollama can
   run on a separate, more powerful machine (e.g. a gaming PC with a real
-  GPU) while `tessa` keeps running from a laptop with no change in feel.
+  GPU) while `lydia` keeps running from a laptop with no change in feel.
   Resolved design fork: tool execution (file edits, git, shell) stays
   **client-side** always — the server is purely an inference proxy
   (`/v1/health`, `/v1/models`, `/v1/chat`, `/v1/embed`), never touches a
@@ -80,7 +80,7 @@ context — each one names the files to touch and what "done" looks like.
   never have to interrupt the server mid-stream) and a chat turn keeps the
   same shape Ollama's own `/api/chat` already has.
   - `llm/protocol.py::ModelClient` — the structural interface both
-    `OllamaClient` (local) and `RemoteClient` (server/tessa_server, over
+    `OllamaClient` (local) and `RemoteClient` (server/lydia_server, over
     HTTPS + bearer auth) satisfy; everything downstream (`agent/loop.py`,
     `agent/tools.py`, `context/indexer.py`/`retriever.py`) type-hints
     against this, not a concrete class.
@@ -90,17 +90,17 @@ context — each one names the files to touch and what "done" looks like.
   - `llm/client.py` gained three module-level helpers so the wire format
     exists in exactly one place: `build_chat_payload`, `parse_chat_line`
     (client-side parsing), `serialize_chat_chunk` (server-side, the
-    inverse) — `server/tessa_server/api/v1.py` reuses `OllamaClient`
+    inverse) — `server/lydia_server/api/v1.py` reuses `OllamaClient`
     directly as its provider rather than reimplementing Ollama-calling
     logic.
   - Auth: bearer token, `{token: user_id}` mapping sourced from env vars
-    (`TESSA_SERVER_TOKEN` / `TESSA_SERVER_TOKENS`) — swappable for a real
+    (`LYDIA_SERVER_TOKEN` / `LYDIA_SERVER_TOKENS`) — swappable for a real
     multi-user store later without changing the auth dependency's
     interface. HTTPS via `tailscale cert` (see `server/README.md`) rather
     than a self-signed cert, since there's no public domain to get a
     normal one for a Tailscale-only host.
   - Verified end-to-end against the real Ollama daemon: started the real
-    server locally, pointed a real `tessa` session at it, ran a full
+    server locally, pointed a real `lydia` session at it, ran a full
     chat + tool-call turn (`read_file`) through the whole stack, confirmed
     via server logs that only `/v1/chat` traffic occurred — no file access
     — proving tool execution genuinely stayed client-side. Also confirmed
@@ -120,7 +120,7 @@ parses, so it silently never uses *any* tool. Confirmed via a direct
 Verify tool-calling support empirically (a simple curl test, not vibes)
 before recommending a new default model — see `CLAUDE.md` for the check.
 
-M3 was done before M2 on purpose: it was the part that turns Tessa into an
+M3 was done before M2 on purpose: it was the part that turns Lydia into an
 *agent* rather than a chatbot, and every repo tested against so far fits
 comfortably in a model's context window, so retrieval wasn't yet the
 bottleneck as of M3. M2 removes that ceiling for larger repos.
@@ -149,7 +149,7 @@ and `ROADMAP.md`'s history for the client/server split entry above:
 - **Non-Ollama providers** (OpenAI, Anthropic, Gemini) — opt-in, bring
   your own key, never the default (that would compromise the whole "no
   API keys required" premise for anyone not opting in). Each is just a
-  new class satisfying `tessa.llm.protocol.ModelClient`; `services/ollama_provider.py`
+  new class satisfying `lydia.llm.protocol.ModelClient`; `services/ollama_provider.py`
   is the only file that currently decides which one gets constructed.
 - **Task queue / background jobs, project indexing service, vector DB
   beyond the current SQLite approach, web dashboard.** All from the

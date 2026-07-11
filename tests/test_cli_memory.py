@@ -1,11 +1,11 @@
-"""CLI-level tests for `tessa memory add/list/forget`."""
+"""CLI-level tests for `lydia memory add/list/forget`."""
 
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
-from tessa.cli.main import app
+from lydia.cli.main import app
 
 runner = CliRunner()
 

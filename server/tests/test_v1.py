@@ -2,8 +2,8 @@
 
 from fastapi.testclient import TestClient
 
-from tessa.llm.client import OllamaError, parse_chat_line
-from tessa.llm.types import ChatChunk
+from lydia.llm.client import OllamaError, parse_chat_line
+from lydia.llm.types import ChatChunk
 
 from tests.conftest import FakeProvider
 

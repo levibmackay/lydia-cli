@@ -5,9 +5,9 @@ import json
 import httpx
 import pytest
 
-from tessa.llm.client import OllamaError
-from tessa.llm.remote_client import RemoteAuthError, RemoteClient, RemoteConnectionError
-from tessa.llm.types import Message
+from lydia.llm.client import OllamaError
+from lydia.llm.remote_client import RemoteAuthError, RemoteClient, RemoteConnectionError
+from lydia.llm.types import Message
 
 
 def make_remote(handler, api_key: str | None = "secret-token") -> RemoteClient:

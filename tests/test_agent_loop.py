@@ -2,10 +2,10 @@
 
 from pathlib import Path
 
-from tessa.agent.loop import default_stream_fn, run_agent_turn
-from tessa.agent.tools import ToolContext, ToolResult, ToolSpec, build_registry
-from tessa.config.settings import TessaConfig
-from tessa.llm.types import ChatChunk, Message, ToolCall
+from lydia.agent.loop import default_stream_fn, run_agent_turn
+from lydia.agent.tools import ToolContext, ToolResult, ToolSpec, build_registry
+from lydia.config.settings import LydiaConfig
+from lydia.llm.types import ChatChunk, Message, ToolCall
 
 
 class FakeClient:
@@ -21,7 +21,7 @@ class FakeClient:
 
 
 def make_ctx(tmp_path: Path) -> ToolContext:
-    return ToolContext(root=tmp_path, config=TessaConfig(), confirm=lambda req: True)
+    return ToolContext(root=tmp_path, config=LydiaConfig(), confirm=lambda req: True)
 
 
 def test_no_tool_call_returns_text_directly(tmp_path: Path) -> None:
@@ -69,7 +69,7 @@ def test_declined_write_is_reported_back_to_model(tmp_path: Path) -> None:
         [ChatChunk(content="Okay, I won't write it.", done=True)],
     ])
     messages: list[Message] = [Message(role="user", content="write x.py")]
-    ctx = ToolContext(root=tmp_path, config=TessaConfig(), confirm=lambda req: False)
+    ctx = ToolContext(root=tmp_path, config=LydiaConfig(), confirm=lambda req: False)
     reply, _ = run_agent_turn(
         client=client, model="m", temperature=0.7, num_ctx=8192, think=None,
         system_prompt="sys", messages=messages, registry=build_registry(),

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from tessa.tools.paths import PathEscapesProjectError, resolve_within
+from lydia.tools.paths import PathEscapesProjectError, resolve_within
 
 
 def test_resolves_relative_path(tmp_path: Path) -> None:

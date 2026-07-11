@@ -1,7 +1,7 @@
 """Tests for system prompt assembly."""
 
-from tessa.agent.facts import Fact
-from tessa.agent.prompts import SYSTEM_PROMPT, build_system_prompt
+from lydia.agent.facts import Fact
+from lydia.agent.prompts import SYSTEM_PROMPT, build_system_prompt
 
 
 def test_no_summary_or_facts_returns_base_prompt() -> None:

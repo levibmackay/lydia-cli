@@ -5,8 +5,8 @@ import json
 import httpx
 import pytest
 
-from tessa.llm.client import OllamaClient, OllamaError, parse_chat_line, serialize_chat_chunk
-from tessa.llm.types import ChatChunk, Message, ToolCall
+from lydia.llm.client import OllamaClient, OllamaError, parse_chat_line, serialize_chat_chunk
+from lydia.llm.types import ChatChunk, Message, ToolCall
 
 
 def make_client(handler) -> OllamaClient:
@@ -98,7 +98,7 @@ def test_keep_alive_omitted_when_none() -> None:
 def test_serialize_chat_chunk_round_trips_through_parse_chat_line() -> None:
     """serialize_chat_chunk (server-side) and parse_chat_line (client-side)
     must agree on the wire shape — used by RemoteClient against the real
-    Tessa Server, see server/tessa_server/api/v1.py."""
+    Lydia Server, see server/lydia_server/api/v1.py."""
     original = ChatChunk(
         content="hi", thinking="pondering",
         tool_calls=[ToolCall(name="read_file", arguments={"path": "a.py"})],

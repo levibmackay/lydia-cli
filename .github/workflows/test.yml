@@ -23,8 +23,8 @@ jobs:
           pip install -e ".[dev]"
           pip install -e "server/[dev]"
 
-      - name: Test tessa (CLI package)
+      - name: Test lydia (CLI package)
         run: pytest
 
-      - name: Test tessa-server
+      - name: Test lydia-server
         run: cd server && pytest

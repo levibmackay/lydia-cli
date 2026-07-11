@@ -2,12 +2,12 @@
 
 from pathlib import Path
 
-from tessa.context.indexer import (
+from lydia.context.indexer import (
     MAX_CHUNK_LINES,
     build_index,
     chunk_file,
 )
-from tessa.database import sqlite as db
+from lydia.database import sqlite as db
 
 
 class FakeEmbedClient:

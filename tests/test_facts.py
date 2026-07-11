@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from tessa.agent.facts import MAX_FACTS, forget, load_facts, memory_path, remember
+from lydia.agent.facts import MAX_FACTS, forget, load_facts, memory_path, remember
 
 
 def test_load_facts_empty_when_no_file(tmp_path: Path) -> None:

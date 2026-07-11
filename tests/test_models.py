@@ -1,7 +1,7 @@
 """Tests for model auto-selection."""
 
-from tessa.llm.models import pick_default_model
-from tessa.llm.types import ModelInfo
+from lydia.llm.models import pick_default_model
+from lydia.llm.types import ModelInfo
 
 
 def m(name: str, size: int = 1) -> ModelInfo:

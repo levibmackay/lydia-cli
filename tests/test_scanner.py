@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from tessa.context.scanner import scan_project
+from lydia.context.scanner import scan_project
 
 
 def write(path: Path, lines: int) -> None:

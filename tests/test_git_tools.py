@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from tessa.tools import git
-from tessa.tools.filesystem import ToolError
+from lydia.tools import git
+from lydia.tools.filesystem import ToolError
 
 
 @pytest.fixture
