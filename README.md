@@ -398,3 +398,5 @@ doesn't block but doesn't need yet either.
 ## License
 
 MIT — see [`LICENSE`](LICENSE).
+
+_Last updated: 2026-07-16_
