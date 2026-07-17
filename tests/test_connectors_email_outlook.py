@@ -11,9 +11,9 @@ def test_get_recent_emails_maps_graph_response() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/v1.0/me/messages"
         return httpx.Response(200, json={"value": [
-            {"from": {"emailAddress": {"name": "Prof Smith", "address": "smith@school.edu"}},
+            {"id": "msg-1", "from": {"emailAddress": {"name": "Prof Smith", "address": "smith@school.edu"}},
              "subject": "Assignment posted", "bodyPreview": "See the new assignment...", "isRead": False},
-            {"from": {"emailAddress": {"address": "noreply@school.edu"}},
+            {"id": "msg-2", "from": {"emailAddress": {"address": "noreply@school.edu"}},
              "subject": "Newsletter", "bodyPreview": "This week...", "isRead": True},
         ]})
 
@@ -23,6 +23,7 @@ def test_get_recent_emails_maps_graph_response() -> None:
     assert summaries[0].unread is True
     assert summaries[1].sender == "noreply@school.edu"  # falls back to address, no name
     assert summaries[1].unread is False
+    assert [s.id for s in summaries] == ["msg-1", "msg-2"]
 
 
 def test_auth_header_sent() -> None:

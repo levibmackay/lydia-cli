@@ -20,6 +20,7 @@ class Assignment:
     name: str
     due_at: str | None
     html_url: str
+    id: str = ""
 
 
 def _get_json(client: httpx.Client, path: str, params: dict | None = None) -> object:
@@ -60,6 +61,7 @@ def get_upcoming_assignments(
                     name=item.get("name") or "Untitled assignment",
                     due_at=item.get("due_at"),
                     html_url=item.get("html_url", ""),
+                    id=str(item.get("id", "")),
                 ))
     assignments.sort(key=lambda a: a.due_at or "9999")
     return assignments

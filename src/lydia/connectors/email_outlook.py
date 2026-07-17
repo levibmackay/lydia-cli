@@ -21,6 +21,7 @@ class EmailSummary:
     subject: str
     snippet: str
     unread: bool
+    id: str = ""
 
 
 def get_recent_emails(
@@ -30,7 +31,7 @@ def get_recent_emails(
 ) -> list[EmailSummary]:
     params = {
         "$top": max_results,
-        "$select": "from,subject,bodyPreview,isRead",
+        "$select": "id,from,subject,bodyPreview,isRead",
         "$orderby": "receivedDateTime desc",
     }
     try:
@@ -55,6 +56,7 @@ def get_recent_emails(
             subject=item.get("subject") or "(no subject)",
             snippet=item.get("bodyPreview", ""),
             unread=not item.get("isRead", True),
+            id=item.get("id", ""),
         ))
     return summaries
 

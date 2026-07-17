@@ -20,11 +20,11 @@ def test_get_upcoming_assignments_across_courses() -> None:
             ])
         if request.url.path == "/api/v1/courses/1/assignments":
             return httpx.Response(200, json=[
-                {"name": "HW3", "due_at": "2026-07-15T23:59:00Z", "html_url": "http://x/1"},
+                {"id": 42, "name": "HW3", "due_at": "2026-07-15T23:59:00Z", "html_url": "http://x/1"},
             ])
         if request.url.path == "/api/v1/courses/2/assignments":
             return httpx.Response(200, json=[
-                {"name": "Project 2", "due_at": "2026-07-12T23:59:00Z", "html_url": "http://x/2"},
+                {"id": 43, "name": "Project 2", "due_at": "2026-07-12T23:59:00Z", "html_url": "http://x/2"},
             ])
         raise AssertionError(f"unexpected path {request.url.path}")
 
@@ -33,6 +33,7 @@ def test_get_upcoming_assignments_across_courses() -> None:
     )
     assert [a.name for a in assignments] == ["Project 2", "HW3"]  # sorted by due date
     assert assignments[0].course_name == "Algorithms"
+    assert assignments[0].id == "43"
 
 
 def test_auth_header_sent() -> None:

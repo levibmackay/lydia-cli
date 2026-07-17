@@ -67,6 +67,7 @@ def test_get_recent_emails_maps_messages() -> None:
     assert summaries[0].subject == "Hello"
     assert summaries[0].unread is True
     assert summaries[1].unread is False
+    assert all(s.id for s in summaries)
 
 
 def test_http_error_raises_connector_error() -> None:

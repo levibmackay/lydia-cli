@@ -27,6 +27,7 @@ class EmailSummary:
     subject: str
     snippet: str
     unread: bool
+    id: str = ""
 
 
 def _load_credentials(credentials_json: str) -> Credentials:
@@ -61,6 +62,7 @@ def get_recent_emails(
                 subject=headers.get("Subject", "(no subject)"),
                 snippet=msg.get("snippet", ""),
                 unread="UNREAD" in msg.get("labelIds", []),
+                id=ref["id"],
             ))
         return summaries
     except HttpError as exc:
