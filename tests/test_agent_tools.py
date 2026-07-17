@@ -348,3 +348,32 @@ def test_update_todos_default_is_empty_and_ephemeral(tmp_path: Path) -> None:
     get("update_todos").handler({"todos": [{"content": "x", "status": "pending"}]}, first)
     second = ctx(tmp_path)
     assert second.todos == []
+
+
+# -- notify tool --------------------------------------------------------
+
+
+def test_notify_tool_without_topic_reports_not_configured(monkeypatch, tmp_path: Path) -> None:
+    from lydia.agent import tools as agent_tools
+    from lydia.config import secrets
+
+    monkeypatch.setattr(secrets, "get_secret", lambda key: None)
+    result = agent_tools._send_notification({"message": "hi"}, ctx(tmp_path))
+    assert result.ok is False
+    assert "lydia auth login ntfy" in result.content
+
+
+def test_notify_tool_sends_push(monkeypatch, tmp_path: Path) -> None:
+    from lydia.agent import tools as agent_tools
+    from lydia.config import secrets
+
+    sent = {}
+    monkeypatch.setattr(secrets, "get_secret", lambda key: "topic-x")
+    monkeypatch.setattr(
+        "lydia.connectors.ntfy.send_push",
+        lambda topic, title, message, priority="default", transport=None: sent.update(
+            {"topic": topic, "title": title, "message": message}),
+    )
+    result = agent_tools._send_notification({"message": "hi", "title": "T"}, ctx(tmp_path))
+    assert result.ok is True
+    assert sent == {"topic": "topic-x", "title": "T", "message": "hi"}

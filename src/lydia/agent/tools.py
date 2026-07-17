@@ -408,6 +408,25 @@ def _check_news(args: dict, ctx: ToolContext) -> ToolResult:
     return ToolResult(ok=True, content=format_news(items), summary=f"checked AI news ({len(items)} headlines)")
 
 
+def _send_notification(args: dict, ctx: ToolContext) -> ToolResult:
+    from lydia.config import secrets
+    from lydia.connectors import ntfy
+
+    topic = secrets.get_secret(secrets.NTFY_TOPIC)
+    if not topic:
+        return ToolResult(
+            ok=False,
+            content="Phone notifications aren't set up. Tell the user to run `lydia auth login ntfy`.",
+            summary="not configured",
+        )
+    try:
+        ntfy.send_push(topic, args.get("title", "Lydia"), args["message"])
+    except ConnectorError as exc:
+        return ToolResult(ok=False, content=str(exc), summary="error")
+    return ToolResult(ok=True, content="Notification sent to the user's phone.",
+                      summary="sent push notification")
+
+
 # Tools that change something on disk or in git. Plan mode strips exactly
 # these out of the registry, regardless of risk tier — git_add is "safe"
 # risk (no confirmation needed) but still mutates the index, so risk tier
@@ -692,5 +711,18 @@ def build_registry() -> list[ToolSpec]:
         ToolSpec(
             "check_news", "Get recent AI news headlines from a curated set of sources.",
             {"type": "object", "properties": {}}, "safe", _check_news,
+        ),
+        ToolSpec(
+            "notify", "Send a push notification to the user's phone. Use for genuinely "
+            "important, time-sensitive information — not routine replies.",
+            {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string", "description": "The notification body"},
+                    "title": {"type": "string", "description": "Short title (optional)"},
+                },
+                "required": ["message"],
+            },
+            "safe", _send_notification,
         ),
     ]

@@ -24,6 +24,7 @@ OUTLOOK_TOKEN_CACHE = "outlook_token_cache"
 OUTLOOK_CLIENT_ID = "outlook_client_id"
 OUTLOOK_AUTHORITY = "outlook_authority"
 CANVAS_TOKEN = "canvas_token"
+NTFY_TOPIC = "ntfy_topic"
 
 
 class SecretsError(Exception):
