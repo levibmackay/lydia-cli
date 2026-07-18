@@ -67,6 +67,10 @@ briefing_app = typer.Typer(help="Generate and view Lydia's daily personal briefi
 app.add_typer(briefing_app, name="briefing")
 schedule_app = typer.Typer(help="Manage the daily scheduled briefing (macOS launchd).")
 briefing_app.add_typer(schedule_app, name="schedule")
+automations_app = typer.Typer(help="Create and manage plain-English automations.")
+app.add_typer(automations_app, name="automations")
+automations_schedule_app = typer.Typer(help="Manage the automations heartbeat (macOS launchd).")
+automations_app.add_typer(automations_schedule_app, name="schedule")
 
 
 def _memory_root() -> Path:
@@ -371,12 +375,12 @@ def restore_apply(index: int = typer.Argument(..., help="Backup number, as shown
     ui.print_info(message)
 
 
-AUTH_PROVIDERS = ("gmail", "outlook", "canvas")
+AUTH_PROVIDERS = ("gmail", "outlook", "canvas", "ntfy")
 
 
 @auth_app.command("login")
 def auth_login(
-    provider: str = typer.Argument(..., help="gmail | outlook | canvas"),
+    provider: str = typer.Argument(..., help="gmail | outlook | canvas | ntfy"),
     client_id: str | None = typer.Option(
         None, "--client-id", help="Outlook only: the Azure app's Application (client) ID."
     ),
@@ -387,7 +391,7 @@ def auth_login(
         None, "--token", help="Canvas only: a personal access token (prompted if omitted)."
     ),
 ) -> None:
-    """Connect a personal-assistant data source (Gmail, Outlook, or Canvas)."""
+    """Connect a personal-assistant data source (Gmail, Outlook, Canvas, or ntfy)."""
     if provider == "gmail":
         from lydia.connectors.auth import gmail_oauth
         ui.print_info("Opening a browser to sign in to Gmail...")
@@ -416,13 +420,27 @@ def auth_login(
         save_config_value("canvas_base_url", base_url, global_config_path())
         secrets.set_secret(secrets.CANVAS_TOKEN, token)
         ui.print_info(f"Canvas configured: {base_url}")
+    elif provider == "ntfy":
+        import secrets as pysecrets
+        from lydia.config import secrets as lydia_secrets
+
+        topic = f"lydia-{pysecrets.token_hex(6)}"
+        lydia_secrets.set_secret(lydia_secrets.NTFY_TOPIC, topic)
+        ui.print_info(
+            f"Your private ntfy topic: {topic}\n"
+            "1. Install the ntfy app (App Store / Play Store)\n"
+            f"2. Subscribe to the topic '{topic}'\n"
+            "3. Test it: lydia auth status ntfy — or just wait for an automation to fire.\n"
+            "Treat the topic name like a password — anyone who knows it can read your alerts."
+        )
+        return
     else:
         ui.print_error(f"Unknown provider '{provider}'. Use one of: {', '.join(AUTH_PROVIDERS)}.")
         raise typer.Exit(1)
 
 
 @auth_app.command("status")
-def auth_status() -> None:
+def auth_status(provider: str | None = typer.Argument(None, help="Specific provider or None for all")) -> None:
     """Show which personal-assistant sources are connected."""
     from lydia.config import secrets
     from lydia.connectors.auth import gmail_oauth, outlook_oauth
@@ -432,14 +450,41 @@ def auth_status() -> None:
         ("gmail", gmail_oauth.is_logged_in()),
         ("outlook", outlook_oauth.is_logged_in()),
         ("canvas", bool(config.canvas_base_url and secrets.get_secret(secrets.CANVAS_TOKEN))),
+        ("ntfy", bool(secrets.get_secret(secrets.NTFY_TOPIC))),
     ]
-    for name, connected in rows:
-        marker = "[green]connected[/green]" if connected else "[dim]not connected[/dim]"
-        ui.console.print(f"  {name:<8} {marker}")
+
+    if provider:
+        # Show topic for ntfy
+        if provider == "ntfy":
+            topic = secrets.get_secret(secrets.NTFY_TOPIC)
+            if topic:
+                ui.console.print(f"  {provider:<8} [green]connected[/green]")
+                ui.console.print(f"  Topic: {topic}")
+            else:
+                ui.console.print(f"  {provider:<8} [dim]not connected[/dim]")
+        else:
+            # Show status for other providers
+            status_map = {name: connected for name, connected in rows}
+            if provider in status_map:
+                connected = status_map[provider]
+                marker = "[green]connected[/green]" if connected else "[dim]not connected[/dim]"
+                ui.console.print(f"  {provider:<8} {marker}")
+            else:
+                ui.print_error(f"Unknown provider '{provider}'.")
+                raise typer.Exit(1)
+    else:
+        # Show all
+        for name, connected in rows:
+            marker = "[green]connected[/green]" if connected else "[dim]not connected[/dim]"
+            if name == "ntfy" and connected:
+                topic = secrets.get_secret(secrets.NTFY_TOPIC)
+                ui.console.print(f"  {name:<8} {marker}  [dim]{topic}[/dim]")
+            else:
+                ui.console.print(f"  {name:<8} {marker}")
 
 
 @auth_app.command("logout")
-def auth_logout(provider: str = typer.Argument(..., help="gmail | outlook | canvas")) -> None:
+def auth_logout(provider: str = typer.Argument(..., help="gmail | outlook | canvas | ntfy")) -> None:
     """Disconnect a personal-assistant data source."""
     if provider == "gmail":
         from lydia.connectors.auth import gmail_oauth
@@ -450,6 +495,9 @@ def auth_logout(provider: str = typer.Argument(..., help="gmail | outlook | canv
     elif provider == "canvas":
         from lydia.config import secrets
         secrets.delete_secret(secrets.CANVAS_TOKEN)
+    elif provider == "ntfy":
+        from lydia.config import secrets
+        secrets.delete_secret(secrets.NTFY_TOPIC)
     else:
         ui.print_error(f"Unknown provider '{provider}'. Use one of: {', '.join(AUTH_PROVIDERS)}.")
         raise typer.Exit(1)
@@ -503,6 +551,158 @@ def schedule_disable() -> None:
     scheduler.disable()
     save_config_value("briefing_schedule_enabled", False, global_config_path())
     ui.print_info("Scheduled briefing disabled.")
+
+
+def _client_and_model(config: LydiaConfig):
+    """Connect, or exit(1) with a printed error. Caller must close the client."""
+    from lydia.cli.chat import resolve_model
+
+    client = build_client(config)
+    if not client.is_alive():
+        ui.print_error(f"Cannot reach {config.server_url or config.ollama_host}.")
+        raise typer.Exit(1)
+    try:
+        model = resolve_model(client, config)
+    except OllamaError as exc:
+        ui.print_error(str(exc))
+        raise typer.Exit(1)
+    return client, model
+
+
+@app.command()
+def automate(request: str = typer.Argument(..., help="What to automate, in plain English")) -> None:
+    """Create an automation from a plain-English description."""
+    from lydia.cli.automate_flow import create_from_english
+
+    config = load_config()
+    client, model = _client_and_model(config)
+    with client:
+        ok = create_from_english(request, client, model, config)
+    raise typer.Exit(0 if ok else 1)
+
+
+@automations_app.command("list")
+def automations_list() -> None:
+    from lydia.automations import store
+    autos = store.list_automations()
+    if not autos:
+        ui.print_info("No automations yet. Create one with: lydia automate \"...\"")
+        return
+    from lydia.automations.model import describe
+    state = store.load_state()
+    for auto in autos:
+        flag = "" if auto.enabled else " [disabled]"
+        last = state.get(auto.name, {}).get("last_run", "never")
+        ui.console.print(f"{describe(auto)}{flag}  [dim]last run: {last}[/dim]")
+
+
+@automations_app.command("show")
+def automations_show(name: str) -> None:
+    import json as _json
+    from lydia.automations import store
+    from lydia.automations.model import AutomationError, describe
+    try:
+        auto = store.load_automation(name)
+    except AutomationError as exc:
+        ui.print_error(str(exc))
+        raise typer.Exit(1)
+    ui.console.print(describe(auto))
+    ui.console.print(_json.dumps(auto.to_dict(), indent=2))
+
+
+@automations_app.command("run")
+def automations_run(name: str) -> None:
+    """Execute one automation immediately (ignores its trigger) — for testing."""
+    from datetime import datetime
+    from lydia.automations import runner as auto_runner, store
+    from lydia.automations.model import AutomationError
+    try:
+        auto = store.load_automation(name)
+    except AutomationError as exc:
+        ui.print_error(str(exc))
+        raise typer.Exit(1)
+    config = load_config()
+    client, model = _client_and_model(config)
+    with client:
+        state = store.load_state()
+        sections = None
+        if auto.trigger.type == "event":
+            items = auto_runner.poll_new_items(auto.trigger, config)
+            sections = [("current items", "\n".join(t for _i, t in items))]
+        record = auto_runner.run_one(auto, config, client, model,
+                                     datetime.now(), state, extra_sections=sections)
+        store.save_state(state)
+        store.append_run(record)
+    ui.console.print(record["result_snippet"] or "(no output)")
+    ui.print_info(f"ok={record['ok']} notified={record['notified']}")
+
+
+@automations_app.command("enable")
+def automations_enable(name: str) -> None:
+    _set_enabled(name, True)
+
+
+@automations_app.command("disable")
+def automations_disable(name: str) -> None:
+    _set_enabled(name, False)
+
+
+def _set_enabled(name: str, value: bool) -> None:
+    from lydia.automations import store
+    from lydia.automations.model import AutomationError
+    try:
+        auto = store.load_automation(name)
+    except AutomationError as exc:
+        ui.print_error(str(exc))
+        raise typer.Exit(1)
+    auto.enabled = value
+    store.save_automation(auto)
+    ui.print_info(f"'{name}' {'enabled' if value else 'disabled'}.")
+
+
+@automations_app.command("remove")
+def automations_remove(name: str) -> None:
+    from lydia.automations import store
+    if store.delete_automation(name):
+        ui.print_info(f"Removed '{name}'.")
+    else:
+        ui.print_error(f"No automation named '{name}'.")
+        raise typer.Exit(1)
+
+
+@automations_app.command("tick")
+def automations_tick() -> None:
+    """One heartbeat pass — normally invoked by launchd, not by hand."""
+    from lydia.automations import runner as auto_runner
+    config = load_config()
+    client, model = _client_and_model(config)
+    with client:
+        results = auto_runner.tick(config, client, model)
+    for record in results:
+        status = "ok" if record["ok"] else f"FAILED: {record['error']}"
+        ui.console.print(f"{record['name']}: {status}")
+    if not results:
+        ui.print_info("Nothing due.")
+
+
+@automations_schedule_app.command("enable")
+def automations_schedule_enable(
+    interval: int = typer.Option(300, "--interval", help="Seconds between ticks (60-3600)"),
+) -> None:
+    from lydia.cli import scheduler
+    try:
+        path = scheduler.enable_automations(interval_seconds=interval)
+    except scheduler.ScheduleError as exc:
+        ui.print_error(str(exc))
+        raise typer.Exit(1)
+    ui.print_info(f"Heartbeat enabled every {interval}s ({path}).")
+
+
+@automations_schedule_app.command("disable")
+def automations_schedule_disable() -> None:
+    from lydia.cli import scheduler
+    scheduler.disable_automations()
+    ui.print_info("Heartbeat disabled.")
 
 
 def main() -> None:

@@ -152,4 +152,4 @@ def describe(auto: Automation) -> str:
         dest = "no notification"
     if auto.notify.when == "if_important":
         dest += ", only if important"
-    return f"[{auto.name}] {when}: {' → '.join(parts)} → {dest}"
+    return f"\\[{auto.name}\\] {when}: {' → '.join(parts)} → {dest}"

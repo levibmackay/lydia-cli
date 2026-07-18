@@ -34,6 +34,7 @@ HELP_TEXT = """\
 | `/remember <fact>` | Save a fact that persists across sessions |
 | `/memory` | List remembered facts |
 | `/forget <n>` | Remove remembered fact #n |
+| `/automate <text>` | Create an automation in plain English |
 | `/exit` | Quit (also Ctrl-D) |
 """
 
@@ -283,6 +284,12 @@ def _handle_slash(text: str, session: ChatSession) -> bool:
             else:
                 session.refresh_facts()
                 ui.print_info(f"Forgot: {removed.text}")
+    elif command == "/automate":
+        if not argument:
+            ui.print_error("Usage: /automate <what to automate, in plain English>")
+        else:
+            from lydia.cli.automate_flow import create_from_english
+            create_from_english(argument, session.client, session.model, session.config)
     else:
         ui.print_error(f"Unknown command {command}. Try /help.")
     return False
