@@ -591,9 +591,10 @@ def automations_list() -> None:
     from lydia.automations.model import describe
     state = store.load_state()
     for auto in autos:
-        flag = "" if auto.enabled else " [disabled]"
+        flag = "" if auto.enabled else " (disabled)"
         last = state.get(auto.name, {}).get("last_run", "never")
-        ui.console.print(f"{describe(auto)}{flag}  [dim]last run: {last}[/dim]")
+        from rich.markup import escape
+        ui.console.print(f"{escape(describe(auto) + flag)}  [dim]last run: {last}[/dim]")
 
 
 @automations_app.command("show")
@@ -606,7 +607,8 @@ def automations_show(name: str) -> None:
     except AutomationError as exc:
         ui.print_error(str(exc))
         raise typer.Exit(1)
-    ui.console.print(describe(auto))
+    from rich.markup import escape
+    ui.console.print(escape(describe(auto)))
     ui.console.print(_json.dumps(auto.to_dict(), indent=2))
 
 

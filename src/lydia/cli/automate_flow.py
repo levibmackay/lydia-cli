@@ -4,6 +4,7 @@ and the /automate slash command in chat."""
 from __future__ import annotations
 
 import typer
+from rich.markup import escape
 
 from lydia.automations import store
 from lydia.automations.model import describe
@@ -20,7 +21,7 @@ def create_from_english(text: str, client: ModelClient, model: str,
     except AutomationParseError as exc:
         ui.print_error(str(exc))
         return False
-    ui.console.print(f"\nHere's what I understood:\n  {describe(auto)}\n")
+    ui.console.print(f"\nHere's what I understood:\n  {escape(describe(auto))}\n")
     exists = store.recipe_path(auto.name).exists()
     prompt = "Overwrite this existing automation?" if exists else "Save this automation?"
     if not typer.confirm(prompt):
