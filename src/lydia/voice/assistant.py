@@ -21,14 +21,19 @@ from lydia.voice import audio
 
 logger = logging.getLogger(__name__)
 
-VOICE_TOOLS = {"check_email", "check_canvas", "check_stocks", "check_news", "notify"}
+VOICE_TOOLS = {
+    "check_email", "check_canvas", "check_stocks", "check_news", "notify",
+    "check_weather", "check_calendar", "open_app", "find_files", "read_file",
+}
 
 VOICE_SYSTEM_PROMPT = (
     "You are Lydia, a spoken voice assistant. The user talked to you out loud "
     "and your reply will be read aloud by text-to-speech. Answer in one to "
     "three short sentences of plain conversational prose — no markdown, no "
-    "lists, no code, no emoji. Use your tools when the question needs live "
-    "data (email, Canvas, stocks, news); otherwise just answer."
+    "lists, no code, no emoji. You have tools for live data (email, Canvas, "
+    "calendar, weather, stocks, news), for finding and reading the user's "
+    "files, and for opening apps or files — use them whenever the request "
+    "needs them, without asking permission. Otherwise just answer."
 )
 
 _CHIMES = {"wake": "/System/Library/Sounds/Glass.aiff",
@@ -67,7 +72,7 @@ def run_loop(config: LydiaConfig, client: ModelClient, model: str, *,
             reply, _stats = run_agent_turn(
                 client=client, model=model,
                 temperature=config.temperature, num_ctx=config.num_ctx,
-                think=config.think_flag, keep_alive=config.keep_alive,
+                think=False, keep_alive=config.keep_alive,
                 system_prompt=VOICE_SYSTEM_PROMPT,
                 messages=[Message(role="user", content=text)],
                 registry=registry, ctx=ctx,

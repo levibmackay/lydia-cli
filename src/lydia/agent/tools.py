@@ -26,6 +26,7 @@ Session modes (config.mode, see config/settings.py):
 
 from __future__ import annotations
 
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Literal
@@ -446,6 +447,27 @@ def _send_notification(args: dict, ctx: ToolContext) -> ToolResult:
                       summary="sent push notification")
 
 
+def _open_item(args: dict, ctx: ToolContext) -> ToolResult:
+    """Open a macOS app by name, or a file/folder by path, via `open`."""
+    target = str(args.get("target", "")).strip()
+    if not target:
+        return ToolResult(ok=False, content="Nothing to open: 'target' is required.")
+    from pathlib import Path as _Path
+
+    looks_like_path = "/" in target or target.startswith("~")
+    if looks_like_path:
+        path = _Path(target).expanduser()
+        if not path.exists():
+            return ToolResult(ok=False, content=f"No such file or folder: {target}")
+        cmd = ["open", str(path)]
+    else:
+        cmd = ["open", "-a", target]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        return ToolResult(ok=False, content=f"Could not open {target}: {(result.stderr or '').strip()}")
+    return ToolResult(ok=True, content=f"Opened {target}.")
+
+
 # Tools that change something on disk or in git. Plan mode strips exactly
 # these out of the registry, regardless of risk tier — git_add is "safe"
 # risk (no confirmation needed) but still mutates the index, so risk tier
@@ -761,5 +783,14 @@ def build_registry() -> list[ToolSpec]:
                 "required": [],
             },
             "safe", _check_calendar,
+        ),
+        ToolSpec(
+            "open_app", "Open a macOS application by name, or a file/folder by path.",
+            {
+                "type": "object",
+                "properties": {"target": {"type": "string", "description": "App name (e.g. 'Spotify') or a file/folder path"}},
+                "required": ["target"],
+            },
+            "safe", _open_item,
         ),
     ]

@@ -81,3 +81,28 @@ def test_voice_registry_is_safe_tools_only():
     names = {spec.name for spec in assistant.voice_registry()}
     assert names == assistant.VOICE_TOOLS
     assert "write_file" not in names and "run_command" not in names
+
+
+def test_voice_registry_includes_new_tools():
+    names = {spec.name for spec in assistant.voice_registry()}
+    for expected in ("check_weather", "check_calendar", "open_app", "find_files", "read_file"):
+        assert expected in names
+    assert "write_file" not in names and "run_command" not in names
+
+
+@pytest.fixture
+def no_real_push(monkeypatch):
+    """Prevent actual push notification setup."""
+    monkeypatch.setenv("NTFY_TOPIC", "")
+
+
+def test_voice_turn_disables_thinking(no_real_push, monkeypatch):
+    seen = {}
+    real = assistant.run_agent_turn
+    def spy(**kwargs):
+        seen.update(kwargs)
+        return real(**kwargs)
+    monkeypatch.setattr(assistant, "run_agent_turn", spy)
+    spoken, chimes = [], []
+    _run(FakeClient(["ok"]), "hello", spoken, chimes)
+    assert seen["think"] is False

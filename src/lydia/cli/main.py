@@ -727,7 +727,7 @@ def listen_run(ctx: typer.Context) -> None:
         if not client.is_alive():
             ui.print_error(f"Cannot reach {config.server_url or config.ollama_host}.")
             raise typer.Exit(1)
-        model = resolve_model(client, config)
+        model = config.voice_model or resolve_model(client, config)
         ui.print_info(f'Listening for "{config.voice_wake_word.replace("_", " ")}" — Ctrl-C to stop.')
         try:
             assistant.run_loop(

@@ -409,3 +409,47 @@ def test_check_calendar_tool(tmp_path, monkeypatch):
     monkeypatch.setattr(calendar_mac, "get_events", lambda days=2, runner=None: f"{days} days: Dentist Tuesday")
     result = agent_tools._check_calendar({"days": 5}, ctx(tmp_path))
     assert result.ok and "Dentist" in result.content and "5 days" in result.content
+
+
+# -- open_app tool -------------------------------------------------------
+
+
+def test_open_app_launches_named_app(tmp_path, monkeypatch):
+    import subprocess
+    from lydia.agent import tools
+
+    calls = []
+    monkeypatch.setattr(tools.subprocess, "run",
+                        lambda cmd, **kw: calls.append(cmd) or subprocess.CompletedProcess(cmd, 0, "", ""))
+    result = tools._open_item({"target": "Spotify"}, ctx(tmp_path))
+    assert result.ok and calls == [["open", "-a", "Spotify"]]
+
+
+def test_open_app_opens_existing_path(tmp_path, monkeypatch):
+    import subprocess
+    from lydia.agent import tools
+
+    doc = tmp_path / "resume.pdf"
+    doc.write_text("x")
+    calls = []
+    monkeypatch.setattr(tools.subprocess, "run",
+                        lambda cmd, **kw: calls.append(cmd) or subprocess.CompletedProcess(cmd, 0, "", ""))
+    result = tools._open_item({"target": str(doc)}, ctx(tmp_path))
+    assert result.ok and calls == [["open", str(doc)]]
+
+
+def test_open_app_missing_path_fails(tmp_path):
+    from lydia.agent import tools
+
+    result = tools._open_item({"target": str(tmp_path / "nope.txt")}, ctx(tmp_path))
+    assert not result.ok
+
+
+def test_open_app_failure_reports(tmp_path, monkeypatch):
+    import subprocess
+    from lydia.agent import tools
+
+    monkeypatch.setattr(tools.subprocess, "run",
+                        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, "", "Unable to find application"))
+    result = tools._open_item({"target": "NotARealApp"}, ctx(tmp_path))
+    assert not result.ok and "NotARealApp" in result.content
