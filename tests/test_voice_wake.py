@@ -32,3 +32,12 @@ def test_ignores_other_models_scores():
 
     det = WakeDetector("hey_jarvis", model=Multi([0.1, 0.1]))
     assert det.process(FRAME) is False and det.process(FRAME) is False
+
+
+def test_accepts_custom_model_path():
+    class Custom(FakeOww):
+        def predict(self, frame):
+            return {"hey_lydia": self.scores.pop(0)}
+
+    det = WakeDetector("~/.lydia/hey_lydia.onnx", model=Custom([0.9]))
+    assert det.process(FRAME) is True

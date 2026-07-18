@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
 
@@ -10,10 +12,15 @@ class WakeDetector:
 
     `model` is injectable for tests; the real openWakeWord model is built
     lazily so importing this module never downloads anything.
+
+    `model_name` is either a pre-trained openWakeWord name ("hey_jarvis") or
+    a path to a custom-trained .onnx model file ("~/.lydia/hey_lydia.onnx");
+    openWakeWord keys predictions by the file's stem either way.
     """
 
     def __init__(self, model_name: str, model=None, threshold: float = 0.5):
-        self.model_name = model_name
+        self.model_name = str(Path(model_name).expanduser())
+        self._key = Path(model_name).stem
         self.threshold = threshold
         self._model = model
         self._armed = True
@@ -31,7 +38,7 @@ class WakeDetector:
         return self._model
 
     def process(self, frame: np.ndarray) -> bool:
-        score = self._ensure_model().predict(frame).get(self.model_name, 0.0)
+        score = self._ensure_model().predict(frame).get(self._key, 0.0)
         if score >= self.threshold:
             if self._armed:
                 self._armed = False
