@@ -408,6 +408,16 @@ def _check_news(args: dict, ctx: ToolContext) -> ToolResult:
     return ToolResult(ok=True, content=format_news(items), summary=f"checked AI news ({len(items)} headlines)")
 
 
+def _check_weather(args: dict, ctx: ToolContext) -> ToolResult:
+    from lydia.connectors import weather
+
+    location = args.get("location") or ctx.config.weather_location
+    try:
+        return ToolResult(ok=True, content=weather.get_weather(location=location))
+    except ConnectorError as exc:
+        return ToolResult(ok=False, content=str(exc))
+
+
 def _send_notification(args: dict, ctx: ToolContext) -> ToolResult:
     from lydia.config import secrets
     from lydia.connectors import ntfy
@@ -724,5 +734,14 @@ def build_registry() -> list[ToolSpec]:
                 "required": ["message"],
             },
             "safe", _send_notification,
+        ),
+        ToolSpec(
+            "check_weather", "Current weather and 2-day forecast for a place (or the user's location).",
+            {
+                "type": "object",
+                "properties": {"location": {"type": "string", "description": "City or place name (optional; defaults to the user's location)"}},
+                "required": [],
+            },
+            "safe", _check_weather,
         ),
     ]

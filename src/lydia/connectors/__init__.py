@@ -8,6 +8,6 @@ raise `ConnectorError` with a message suitable for showing to the model.
 
 from __future__ import annotations
 
+from lydia.connectors.base import ConnectorError
 
-class ConnectorError(Exception):
-    """A connector could not fetch data; message is shown to the model."""
+__all__ = ["ConnectorError"]

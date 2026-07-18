@@ -63,6 +63,11 @@ class LydiaConfig:
     voice_wake_word: str = "hey_jarvis"
     voice_stt_model: str = "base.en"
     voice_tts_voice: str | None = None  # None = system default `say` voice
+    # e.g. "Mountain Home, Idaho". None = auto-detect from IP (works while traveling).
+    weather_location: str | None = None
+    # Model used for voice turns only. None = same resolution as chat. A small
+    # tool-calling model (qwen3.5:4b) keeps spoken replies fast.
+    voice_model: str | None = None
 
     @property
     def think_flag(self) -> bool | None:

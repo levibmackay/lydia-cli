@@ -377,3 +377,23 @@ def test_notify_tool_sends_push(monkeypatch, tmp_path: Path) -> None:
     result = agent_tools._send_notification({"message": "hi", "title": "T"}, ctx(tmp_path))
     assert result.ok is True
     assert sent == {"topic": "topic-x", "title": "T", "message": "hi"}
+
+
+# -- weather tool --------------------------------------------------------
+
+
+def test_check_weather_uses_config_location(tmp_path, monkeypatch):
+    from lydia.agent import tools as agent_tools
+    from lydia.connectors import weather as weather_mod
+
+    seen = {}
+    def mock_get_weather(location=None, transport=None):
+        seen["loc"] = location
+        return "Sunny, 90F"
+
+    monkeypatch.setattr(weather_mod, "get_weather", mock_get_weather)
+    context = ctx(tmp_path)
+    context.config.weather_location = "Mountain Home"
+    result = agent_tools._check_weather({}, context)
+    assert result.ok and "Sunny" in result.content
+    assert seen["loc"] == "Mountain Home"
