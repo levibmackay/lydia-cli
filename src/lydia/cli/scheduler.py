@@ -99,3 +99,69 @@ def disable(runner: Runner = subprocess.run) -> None:
 
 def is_enabled() -> bool:
     return PLIST_PATH.is_file()
+
+
+AUTOMATIONS_LABEL = "com.lydia.automations"
+AUTOMATIONS_PLIST_PATH = Path.home() / "Library" / "LaunchAgents" / f"{AUTOMATIONS_LABEL}.plist"
+AUTOMATIONS_LOG_PATH = Path.home() / ".lydia" / "automations" / "tick.log"
+
+
+def _interval_plist_contents(lydia_path: str, seconds: int) -> str:
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+\t<key>Label</key>
+\t<string>{AUTOMATIONS_LABEL}</string>
+\t<key>ProgramArguments</key>
+\t<array>
+\t\t<string>{lydia_path}</string>
+\t\t<string>automations</string>
+\t\t<string>tick</string>
+\t</array>
+\t<key>StartInterval</key>
+\t<integer>{seconds}</integer>
+\t<key>StandardOutPath</key>
+\t<string>{AUTOMATIONS_LOG_PATH}</string>
+\t<key>StandardErrorPath</key>
+\t<string>{AUTOMATIONS_LOG_PATH}</string>
+</dict>
+</plist>
+"""
+
+
+def enable_automations(
+    interval_seconds: int = 300,
+    lydia_path: str | None = None,
+    runner: Runner = subprocess.run,
+) -> Path:
+    """Write and load the automations heartbeat plist. Returns its path."""
+    if not 60 <= interval_seconds <= 3600:
+        raise ScheduleError("Interval must be between 60 and 3600 seconds.")
+    resolved_path = lydia_path or _find_lydia_executable()
+    AUTOMATIONS_PLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
+    AUTOMATIONS_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    AUTOMATIONS_PLIST_PATH.write_text(
+        _interval_plist_contents(resolved_path, interval_seconds), encoding="utf-8"
+    )
+    result = runner(
+        ["launchctl", "load", str(AUTOMATIONS_PLIST_PATH)],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise ScheduleError(f"launchctl load failed: {(result.stderr or result.stdout).strip()}")
+    return AUTOMATIONS_PLIST_PATH
+
+
+def disable_automations(runner: Runner = subprocess.run) -> None:
+    if not AUTOMATIONS_PLIST_PATH.is_file():
+        return
+    runner(
+        ["launchctl", "unload", str(AUTOMATIONS_PLIST_PATH)], capture_output=True, text=True
+    )
+    AUTOMATIONS_PLIST_PATH.unlink()
+
+
+def automations_enabled() -> bool:
+    return AUTOMATIONS_PLIST_PATH.is_file()

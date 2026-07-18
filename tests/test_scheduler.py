@@ -64,3 +64,38 @@ def test_disable_is_a_noop_when_not_enabled() -> None:
 
     scheduler.disable(runner=tracking_runner)
     assert calls == []
+
+
+def test_enable_automations_writes_interval_plist(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(scheduler, "AUTOMATIONS_PLIST_PATH", tmp_path / "auto.plist")
+    calls = []
+
+    def fake_runner(cmd, **kwargs):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    path = scheduler.enable_automations(
+        interval_seconds=300, lydia_path="/bin/lydia", runner=fake_runner
+    )
+    text = path.read_text()
+    assert "<key>StartInterval</key>" in text and "<integer>300</integer>" in text
+    assert "<string>automations</string>" in text and "<string>tick</string>" in text
+    assert calls[0][:2] == ["launchctl", "load"]
+
+
+def test_enable_automations_rejects_silly_interval(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(scheduler, "AUTOMATIONS_PLIST_PATH", tmp_path / "auto.plist")
+    with pytest.raises(scheduler.ScheduleError):
+        scheduler.enable_automations(
+            interval_seconds=10, lydia_path="/bin/lydia", runner=lambda *a, **k: None
+        )
+
+
+def test_disable_automations_unloads_and_removes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    plist = tmp_path / "auto.plist"
+    plist.write_text("x")
+    monkeypatch.setattr(scheduler, "AUTOMATIONS_PLIST_PATH", plist)
+    scheduler.disable_automations(
+        runner=lambda cmd, **k: subprocess.CompletedProcess(cmd, 0, "", "")
+    )
+    assert not plist.exists()
