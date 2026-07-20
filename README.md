@@ -125,6 +125,7 @@ ln -s "$PWD/.venv/bin/lydia" /opt/homebrew/bin/lydia   # or anywhere on your PAT
 | `lydia automations list` / `show <name>` | List all automations or show one in detail |
 | `lydia automations run <name>` | Execute one automation immediately (ignores its trigger) |
 | `lydia automations enable/disable <name>` | Enable or disable an automation |
+| `lydia automations remove <name>` | Delete an automation recipe |
 | `lydia automations schedule enable` / `disable` | Turn the automations heartbeat (launchd) on/off |
 
 Inside chat: `/help`, `/mode [plan\|ask\|auto]` (or Shift-Tab), `/model <name>`,
@@ -472,4 +473,4 @@ doesn't block but doesn't need yet either.
 
 MIT — see [`LICENSE`](LICENSE).
 
-_Last updated: 2026-07-19_
+_Last updated: 2026-07-20_
