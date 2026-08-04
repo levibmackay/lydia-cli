@@ -64,10 +64,6 @@ def test_save_rejects_unknown_key(tmp_path: Path) -> None:
     with pytest.raises(KeyError):
         save_config_value("nope", "x", tmp_path / "config.json")
 
-def test_save_rejects_unknown_key(tmp_path: Path) -> None:
-    with pytest.raises(KeyError):
-        save_config_value("nope", "x", tmp_path / "config.json")
-
 
 def test_boolean_coercion(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
