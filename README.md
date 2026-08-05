@@ -1,6 +1,6 @@
 # Lydia
 
-[![tests](https://github.com/levibmackay/lydia-cli/actions/workflows/test.yml/badge.svg)](https://github.com/levibmackay/lydia-cli/actions/workflows/test.yml)
+[![tests](https://github.com/levimackay/lydia-cli/actions/workflows/test.yml/badge.svg)](https://github.com/levimackay/lydia-cli/actions/workflows/test.yml)
 
 **A local AI coding agent for your terminal — no API keys, no subscriptions,
 no cloud.** Lydia reads your code, answers questions about it, edits files,
@@ -96,7 +96,7 @@ beats "best available and metered."
 ## Install
 
 ```bash
-git clone https://github.com/levibmackay/lydia-cli.git && cd lydia-cli
+git clone https://github.com/levimackay/lydia-cli.git && cd lydia-cli
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 ln -s "$PWD/.venv/bin/lydia" /opt/homebrew/bin/lydia   # or anywhere on your PATH
@@ -487,5 +487,5 @@ _Last reviewed: 2026-07-20 19:33 MDT_
 
 ---
 
-Maintained by [Levi Mackay](https://github.com/levibmackay)
+Maintained by [Levi Mackay](https://github.com/levimackay)
 
